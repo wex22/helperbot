@@ -5,6 +5,7 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
@@ -148,6 +149,15 @@ async def _background_init(bot: Bot) -> None:
             await asyncio.sleep(4)
 
     scheduler.init(bot)
+
+    try:
+        app_url = f"{settings.WEBHOOK_URL.rstrip('/')}/app?token={settings.WEBHOOK_SECRET}"
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="📋 Задачи", web_app=WebAppInfo(url=app_url))
+        )
+        logger.info("Menu button set to %s", app_url)
+    except Exception as e:
+        logger.warning("Failed to set menu button: %s", e)
 
     try:
         await db.check_connection()
