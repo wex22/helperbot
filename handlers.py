@@ -185,7 +185,9 @@ async def on_channel_text(message: Message, bot: Bot) -> None:
         return
     if message.chat.id != settings.CHANNEL_ID:
         return
-    text = message.text or ""
+    text = (message.text or "").strip()
+    if len(text) < 5:  # ignore dots, single chars, empty
+        return
     await _process_channel(message, bot, raw_kind=RawKind.TEXT, content=text)
 
 
@@ -236,7 +238,9 @@ async def _process_channel(
     if result.is_close_task_command or result.is_conversational:
         return
 
-    final_content = result.transcript or content or result.title
+    final_content = result.transcript or content or result.title or ""
+    if not final_content.strip():
+        return
     hashtags = [t.lstrip("#") for t in TAG_RE.findall(final_content)]
     tags = list(dict.fromkeys([*result.tags, *hashtags]))
 
