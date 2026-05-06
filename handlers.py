@@ -7,7 +7,13 @@ from typing import Optional
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import ErrorEvent, Message
+from aiogram.types import (
+    ErrorEvent,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    WebAppInfo,
+)
 from dateutil import parser as dateparser
 
 import gemini_client
@@ -45,6 +51,7 @@ async def cmd_start(message: Message) -> None:
         f"Просто пиши мне что угодно — задачи, идеи, напоминания, вопросы.\n"
         f"Или отправь голосовое / фото.\n\n"
         f"Команды:\n"
+        f"/меню — визуальный менеджер задач\n"
         f"/задачи — открытые задачи\n"
         f"/анализ — найти повторы и паттерны\n"
         f"/итоги — сводка за неделю\n"
@@ -55,6 +62,17 @@ async def cmd_start(message: Message) -> None:
         f"Chat id: `{message.chat.id}`",
         parse_mode="Markdown",
     )
+
+
+@router.message(Command("меню"))
+async def cmd_menu(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    url = f"{settings.WEBHOOK_URL.rstrip('/')}/app?token={settings.WEBHOOK_SECRET}"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="📋 Открыть задачи", web_app=WebAppInfo(url=url))
+    ]])
+    await message.answer("Менеджер задач:", reply_markup=kb)
 
 
 @router.message(Command("ping"))

@@ -133,6 +133,35 @@ async def get_open_tasks() -> list[Entry]:
         return [_to_entry(row) for row in r.json()]
 
 
+async def get_all_open(limit: int = 200) -> list[Entry]:
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "status": f"eq.{Status.OPEN.value}",
+            "order": "created_at.desc",
+            "limit": limit,
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
+
+
+async def close_entry(entry_id: int) -> Optional[Entry]:
+    async with _client() as c:
+        r = await c.patch(
+            "/entries",
+            params={"id": f"eq.{entry_id}"},
+            json={"status": Status.DONE.value},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return _to_entry(data[0]) if data else None
+
+
+async def delete_entry(entry_id: int) -> None:
+    async with _client() as c:
+        r = await c.delete("/entries", params={"id": f"eq.{entry_id}"})
+        r.raise_for_status()
+
+
 async def close_task(task_id: int) -> Optional[Entry]:
     async with _client() as c:
         r = await c.patch(
