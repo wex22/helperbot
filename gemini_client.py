@@ -9,8 +9,7 @@ from google.genai import types
 from config import settings
 from models import ClassificationResult, Entry
 
-# Switch to "gemini-2.0-flash" after September 2026 when Gemini Pro subscription ends.
-MODEL = "gemini-2.5-pro"
+MODEL = "gemini-2.0-flash"
 
 _client = genai.Client(api_key=settings.GEMINI_API_KEY)
 logger = logging.getLogger(__name__)
