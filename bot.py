@@ -14,10 +14,15 @@ from config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
+APP_VERSION = "2026-05-06-deploy-check"
 
 
 async def health(_request: web.Request) -> web.Response:
     return web.Response(text="ok")
+
+
+async def version(_request: web.Request) -> web.Response:
+    return web.Response(text=APP_VERSION)
 
 
 async def _background_init(bot: Bot) -> None:
@@ -82,6 +87,7 @@ def build_app() -> web.Application:
 
     app = web.Application()
     app.router.add_get("/health", health)
+    app.router.add_get("/version", version)
     app.router.add_get("/", health)
 
     SimpleRequestHandler(
