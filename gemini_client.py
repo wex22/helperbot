@@ -52,9 +52,9 @@ Recent entries saved by user (newest first):
 
 Rules:
 - Return JSON only. No extra text.
-- is_conversational=true when: user asks a question, wants advice, chats, says hi/thanks, or the message is clearly NOT a note/task/reminder to save.
-  When is_conversational=true: write a helpful, friendly reply in "reply" field (match user's language: Russian or English). Still fill category/title as best you can.
-- is_conversational=false when: user wants to save something (task, idea, reminder, note, thought).
+- is_conversational=true ONLY when: user directly asks a question, wants advice, says hi/thanks, or clearly just wants to chat. NOT for: links, IDs, technical strings, random words, short nouns.
+  When is_conversational=true: write a short, helpful reply in "reply" field (match user's language). Do NOT paste long lists unless user explicitly asks "what can you do" or "что умеешь".
+- is_conversational=false when: user wants to save something (task, idea, reminder, note, thought), OR sends a link/ID/technical string/random content — save it as a note instead.
 - Russian "напомни/напомнить" = reminder. "идея/мысль" = idea/thought. "надо/сделать/нужно" = task.
 - Urgency: "срочно/asap/сегодня до/deadline within 24h" => urgent. "когда-нибудь" => someday. Otherwise normal.
 - Resolve relative time ("через 10 минут", "tomorrow at 9") against current datetime for remind_at.
