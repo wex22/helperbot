@@ -29,6 +29,11 @@ router = Router()
 TAG_RE = re.compile(r"#([\wа-яА-ЯёЁ\-]+)", re.UNICODE)
 DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|выполнено|done)\b\s*(\d+)?", re.IGNORECASE)
 
+
+def _md(s: str) -> str:
+    """Escape Markdown special chars so Telegram doesn't choke on titles."""
+    return (s or "").replace("_", "\\_").replace("*", "\\*").replace("[", "\\[").replace("`", "\\`")
+
 # Short-term conversation memory (last 8 messages = 4 exchanges)
 _chat_buffer: list[dict] = []
 _MAX_BUFFER = 8
@@ -110,7 +115,7 @@ async def cmd_tasks(message: Message) -> None:
             if days > 0:
                 age = f" _{days}д_"
         priority_icon = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}.get(t.priority.value, "")
-        lines.append(f"{priority_icon} [{t.id}] {t.title or t.content[:80]}{age}")
+        lines.append(f"{priority_icon} [{t.id}] {_md(t.title or t.content[:80])}{age}")
     await message.answer("\n".join(lines), parse_mode="Markdown")
 
 
@@ -155,7 +160,7 @@ async def cmd_search(message: Message) -> None:
     lines = [f"🔍 *Результаты по «{query}»:*\n"]
     for e in results:
         date_str = e.created_at.strftime("%d.%m") if e.created_at else ""
-        lines.append(f"[{e.id}] {e.category.value} · {e.title or e.content[:80]} _{date_str}_")
+        lines.append(f"[{e.id}] {e.category.value} · {_md(e.title or e.content[:80])} _{date_str}_")
     await message.answer("\n".join(lines), parse_mode="Markdown")
 
 
@@ -309,7 +314,7 @@ async def _process_channel(
     await bot.send_message(
         settings.MY_CHAT_ID,
         f"{cat_icon} Канал · {pri_icon} {result.priority.value} · "
-        f"[{entry.id}] _{entry.title}_",
+        f"[{entry.id}] _{_md(entry.title)}_",
         parse_mode="Markdown",
     )
 
@@ -456,7 +461,7 @@ async def _process(
 
     reply_text = (
         f"{cat_icon} Сохранено · {pri_icon} {result.priority.value} · "
-        f"[{entry.id}] _{entry.title}_{reminder_msg}{transcript_preview}"
+        f"[{entry.id}] _{_md(entry.title)}_{reminder_msg}{transcript_preview}"
     )
     _buf_add("bot", reply_text)
     await message.answer(reply_text, parse_mode="Markdown")
