@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     BOT_TOKEN: str
-    GEMINI_API_KEY: str
+    GROQ_API_KEY: str
     SUPABASE_URL: str
     SUPABASE_KEY: str
     NOTION_TOKEN: str
