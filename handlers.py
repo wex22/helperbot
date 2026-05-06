@@ -125,7 +125,12 @@ async def _process(
     audio: Optional[bytes] = None,
     image: Optional[bytes] = None,
 ) -> None:
-    history = await db.get_recent(20)
+    try:
+        history = await db.get_recent(20)
+    except Exception:
+        logger.exception("Supabase history lookup failed")
+        history = []
+
     try:
         result: ClassificationResult = await gemini_client.classify(
             content=content, history=history, audio_bytes=audio, image_bytes=image
@@ -154,17 +159,27 @@ async def _process(
     hashtags = [t.lstrip("#") for t in TAG_RE.findall(final_content)]
     tags = list(dict.fromkeys([*result.tags, *hashtags]))
 
-    entry = await db.insert_entry(
-        Entry(
-            content=final_content,
-            title=result.title,
-            category=result.category,
-            priority=result.priority,
-            status=Status.OPEN,
-            tags=tags,
-            raw_kind=raw_kind,
+    try:
+        entry = await db.insert_entry(
+            Entry(
+                content=final_content,
+                title=result.title,
+                category=result.category,
+                priority=result.priority,
+                status=Status.OPEN,
+                tags=tags,
+                raw_kind=raw_kind,
+            )
         )
-    )
+    except Exception:
+        logger.exception("Supabase insert failed")
+        await message.answer(
+            "⚠️ Я понял сообщение, но не смог сохранить его в Supabase.\n"
+            "Проверь `SUPABASE_URL` в Render: должен быть Project URL вида "
+            "`https://<project-ref>.supabase.co`.",
+            parse_mode="Markdown",
+        )
+        return
 
     asyncio.create_task(notion.create_note(entry))
 

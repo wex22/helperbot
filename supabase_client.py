@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
-from httpx import AsyncClient as HttpxClient
+from httpx import AsyncClient as HttpxClient, ConnectError
 
 from config import settings
 from models import Category, Entry, Priority, RawKind, Reminder, Status
 
 # Direct PostgREST calls — bypasses supabase-py auth init (which triggers sync httpx)
-_BASE = f"{settings.SUPABASE_URL}/rest/v1"
+_SUPABASE_URL = settings.SUPABASE_URL.strip().rstrip("/")
+_SUPABASE_HOST = urlparse(_SUPABASE_URL).hostname or "(invalid SUPABASE_URL)"
+_BASE = f"{_SUPABASE_URL}/rest/v1"
 _HEADERS = {
     "apikey": settings.SUPABASE_KEY,
     "Authorization": f"Bearer {settings.SUPABASE_KEY}",
@@ -16,8 +19,25 @@ _HEADERS = {
 }
 
 
+def supabase_host() -> str:
+    return _SUPABASE_HOST
+
+
 def _client() -> HttpxClient:
     return HttpxClient(base_url=_BASE, headers=_HEADERS, timeout=10)
+
+
+async def check_connection() -> None:
+    try:
+        async with _client() as c:
+            r = await c.get("/entries", params={"select": "id", "limit": 1})
+            r.raise_for_status()
+    except ConnectError as e:
+        raise RuntimeError(
+            f"Cannot resolve/reach Supabase host '{_SUPABASE_HOST}'. "
+            "Check SUPABASE_URL in Render: it must be the Supabase Project URL "
+            "from Project Settings → API, like https://<project-ref>.supabase.co"
+        ) from e
 
 
 def _to_entry(row: dict) -> Entry:

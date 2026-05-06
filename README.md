@@ -179,7 +179,7 @@ That's it. No other code changes needed.
 | `NOTION_DB_ID` | 32-char hex |
 | `WEBHOOK_URL` | `https://<your-service>.onrender.com` (no trailing slash) |
 | `MY_CHAT_ID` | your Telegram numeric id |
-| `TZ` | `Europe/Moscow` (or your IANA tz) |
+| `TZ` | `Europe/Warsaw` (or your IANA tz) |
 | `WEBHOOK_SECRET` | any long random string |
 | `PORT` | leave unset — Render injects it |
 
@@ -232,6 +232,7 @@ Plus: any text, voice, or photo message gets classified, stored, mirrored to Not
 ## Troubleshooting
 
 - **No replies at all**: check the bot logs in Render for `Webhook set to ...`. Confirm `MY_CHAT_ID` matches the chat id printed by `/start`.
+- **Supabase says `Name or service not known`**: check Render's `SUPABASE_URL`. It must be the Supabase **Project URL** from Project Settings → API, like `https://<project-ref>.supabase.co`.
 - **Gemini returns non-JSON** error: usually a model overload / safety block. The bot logs the raw response — retry the message.
 - **Reminders don't fire after a redeploy**: rehydrate runs on startup. Check that the row in `reminders` has `fired=false` and a future `remind_at`.
 - **Render keeps sleeping**: confirm UptimeRobot is hitting `/health` with status 200 every 5 min.

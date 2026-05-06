@@ -9,6 +9,7 @@ from aiohttp import web
 
 import handlers
 import scheduler
+import supabase_client as db
 from config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -41,10 +42,12 @@ async def _background_init(bot: Bot) -> None:
     scheduler.init(bot)
 
     try:
+        await db.check_connection()
+        logger.info("Supabase reachable: %s", db.supabase_host())
         await scheduler.rehydrate()
         logger.info("Reminders rehydrated")
     except Exception as e:
-        logger.error("Rehydrate failed (non-fatal): %s", e)
+        logger.error("Supabase startup check/rehydrate failed (non-fatal): %s", e)
 
     try:
         scheduler.schedule_daily_digest(
