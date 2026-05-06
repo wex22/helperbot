@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     NOTION_DB_ID: str
     WEBHOOK_URL: str
     MY_CHAT_ID: int
+    CHANNEL_ID: int = 0
     TZ: str = "Europe/Moscow"
     PORT: int = 8080
     WEBHOOK_SECRET: str = "change-me"

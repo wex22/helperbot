@@ -160,6 +160,108 @@ async def cmd_export(message: Message) -> None:
     await message.answer("```\n" + "\n".join(lines) + "\n```", parse_mode="Markdown")
 
 
+@router.channel_post(F.text)
+async def on_channel_text(message: Message, bot: Bot) -> None:
+    # Discovery: if CHANNEL_ID not set, report which channel the bot was added to
+    if settings.CHANNEL_ID == 0:
+        await bot.send_message(
+            settings.MY_CHAT_ID,
+            f"📡 Бот добавлен в канал!\n"
+            f"Название: {message.chat.title}\n"
+            f"ID канала: `{message.chat.id}`\n\n"
+            f"Скинь этот ID — подключу канал.",
+            parse_mode="Markdown",
+        )
+        return
+    if message.chat.id != settings.CHANNEL_ID:
+        return
+    text = message.text or ""
+    await _process_channel(message, bot, raw_kind=RawKind.TEXT, content=text)
+
+
+@router.channel_post(F.photo)
+async def on_channel_photo(message: Message, bot: Bot) -> None:
+    if settings.CHANNEL_ID == 0 or message.chat.id != settings.CHANNEL_ID:
+        return
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    buf = io.BytesIO()
+    await bot.download_file(file.file_path, destination=buf)
+    caption = message.caption or ""
+    await _process_channel(message, bot, raw_kind=RawKind.PHOTO, content=caption, image=buf.getvalue())
+
+
+@router.channel_post(F.voice)
+async def on_channel_voice(message: Message, bot: Bot) -> None:
+    if settings.CHANNEL_ID == 0 or message.chat.id != settings.CHANNEL_ID:
+        return
+    file = await bot.get_file(message.voice.file_id)
+    buf = io.BytesIO()
+    await bot.download_file(file.file_path, destination=buf)
+    await _process_channel(message, bot, raw_kind=RawKind.VOICE, content="", audio=buf.getvalue())
+
+
+async def _process_channel(
+    message: Message,
+    bot: Bot,
+    *,
+    raw_kind: RawKind,
+    content: str,
+    audio: Optional[bytes] = None,
+    image: Optional[bytes] = None,
+) -> None:
+    try:
+        history = await db.get_recent(20)
+    except Exception:
+        history = []
+
+    try:
+        result: ClassificationResult = await gemini_client.classify(
+            content=content, history=history, audio_bytes=audio, image_bytes=image
+        )
+    except Exception:
+        logger.exception("Groq classification failed (channel)")
+        return
+
+    if result.is_close_task_command or result.is_conversational:
+        return
+
+    final_content = result.transcript or content or result.title
+    hashtags = [t.lstrip("#") for t in TAG_RE.findall(final_content)]
+    tags = list(dict.fromkeys([*result.tags, *hashtags]))
+
+    try:
+        entry = await db.insert_entry(
+            Entry(
+                content=final_content,
+                title=result.title,
+                category=result.category,
+                priority=result.priority,
+                status=Status.OPEN,
+                tags=tags,
+                source="channel",
+                raw_kind=raw_kind,
+            )
+        )
+    except Exception:
+        logger.exception("Supabase insert failed (channel)")
+        return
+
+    asyncio.create_task(notion.create_note(entry))
+
+    category_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝"}
+    priority_icons = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}
+    cat_icon = category_icons.get(result.category.value, "✅")
+    pri_icon = priority_icons.get(result.priority.value, "")
+
+    await bot.send_message(
+        settings.MY_CHAT_ID,
+        f"{cat_icon} Канал · {pri_icon} {result.priority.value} · "
+        f"[{entry.id}] _{entry.title}_",
+        parse_mode="Markdown",
+    )
+
+
 @router.message(F.voice)
 async def on_voice(message: Message, bot: Bot) -> None:
     if not _is_authorized(message):
