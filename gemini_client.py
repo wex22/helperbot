@@ -25,11 +25,23 @@ _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
   "title": "<short title ≤80 chars>",
   "tags": ["tag1", "tag2"],
   "transcript": "<if voice/photo: recognized text or image description, else omit>",
-  "remind_at": "<ISO 8601 with tz offset, only for one-shot reminders, else omit>",
-  "recurrence": "<APScheduler cron 'min hour day month dow', only for recurring, else omit>",
+  "remind_at": "<ISO 8601 with tz offset, only for single one-shot reminder, else omit>",
+  "recurrence": "<cron 'min hour day month dow', only for single recurring, else omit>",
+  "reminders": [
+    {"title": "<short title>", "remind_at": "<ISO 8601 or omit>", "recurrence": "<cron or omit>"}
+  ],
   "is_close_task_command": true | false,
   "close_task_id": <int or omit>
-}"""
+}
+
+MULTIPLE REMINDERS — use "reminders" array (not top-level fields) when user asks for several at once:
+  Example: "каждое утро в 9 список задач, и каждые 30 минут с 9 до 11 напоминай"
+  → reminders: [
+      {"title": "Утро: душ, витамины, список", "recurrence": "0 9 * * *"},
+      {"title": "Напоминание каждые 30 мин", "recurrence": "0,30 9-10 * * *"}
+    ]
+  Cron tips: "каждый день в 9" → "0 9 * * *", "каждые 30 мин с 9 до 11" → "0,30 9-10 * * *",
+  "каждый пн в 9" → "0 9 * * 1", "каждый час" → "0 * * * *"."""
 
 
 def _system_prompt(history: list[Entry], chat_buffer: list[dict]) -> str:

@@ -29,6 +29,13 @@ class RawKind(str, Enum):
     PHOTO = "photo"
 
 
+class ReminderSpec(BaseModel):
+    """One reminder item inside a multi-reminder response."""
+    title: str = ""
+    remind_at: Optional[str] = None   # ISO 8601
+    recurrence: Optional[str] = None  # APScheduler cron
+
+
 class ClassificationResult(BaseModel):
     category: Category = Category.NOTE
     priority: Priority = Priority.NORMAL
@@ -37,6 +44,7 @@ class ClassificationResult(BaseModel):
     transcript: Optional[str] = None
     remind_at: Optional[str] = None
     recurrence: Optional[str] = None
+    reminders: list[ReminderSpec] = Field(default_factory=list)
     is_close_task_command: bool = False
     close_task_id: Optional[int] = None
     is_conversational: bool = False

@@ -21,7 +21,7 @@ import notion_writer as notion
 import scheduler
 import supabase_client as db
 from config import settings
-from models import Category, ClassificationResult, Entry, RawKind, Reminder, Status
+from models import Category, ClassificationResult, Entry, RawKind, Reminder, ReminderSpec, Status
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -429,26 +429,39 @@ async def _process(
 
     reminder_msg = ""
     if result.category == Category.REMINDER:
-        remind_at = None
-        if result.remind_at:
-            try:
-                remind_at = dateparser.isoparse(result.remind_at)
-            except Exception:
-                logger.warning("Bad remind_at: %r", result.remind_at)
-        if remind_at or result.recurrence:
-            reminder = await db.insert_reminder(
-                Reminder(
-                    entry_id=entry.id,
-                    remind_at=remind_at,
-                    recurrence=result.recurrence,
-                    content=entry.title or entry.content[:120],
+        # Multiple reminders from one message
+        specs: list[ReminderSpec] = result.reminders or []
+        if not specs:
+            # Fall back to top-level fields (single reminder)
+            specs = [ReminderSpec(title=result.title, remind_at=result.remind_at, recurrence=result.recurrence)]
+
+        scheduled = []
+        for spec in specs:
+            remind_at = None
+            if spec.remind_at:
+                try:
+                    remind_at = dateparser.isoparse(spec.remind_at)
+                except Exception:
+                    logger.warning("Bad remind_at: %r", spec.remind_at)
+            if remind_at or spec.recurrence:
+                reminder = await db.insert_reminder(
+                    Reminder(
+                        entry_id=entry.id,
+                        remind_at=remind_at,
+                        recurrence=spec.recurrence,
+                        content=spec.title or entry.title or entry.content[:120],
+                    )
                 )
-            )
-            scheduler.schedule_reminder(reminder)
-            if remind_at:
-                reminder_msg = f" · ⏰ {remind_at:%d.%m %H:%M}"
-            elif result.recurrence:
-                reminder_msg = f" · 🔁 {result.recurrence}"
+                scheduler.schedule_reminder(reminder)
+                if spec.recurrence:
+                    scheduled.append(f"🔁 {spec.title or spec.recurrence}")
+                elif remind_at:
+                    scheduled.append(f"⏰ {remind_at:%d.%m %H:%M}")
+
+        if len(scheduled) == 1:
+            reminder_msg = f" · {scheduled[0]}"
+        elif scheduled:
+            reminder_msg = f" · {len(scheduled)} напоминания"
 
     transcript_preview = ""
     if raw_kind in (RawKind.VOICE, RawKind.PHOTO) and result.transcript:
