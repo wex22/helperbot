@@ -7,6 +7,7 @@ from typing import Optional
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
+from aiogram.types import ErrorEvent
 from aiogram.types import Message
 from dateutil import parser as dateparser
 
@@ -35,6 +36,25 @@ async def cmd_start(message: Message) -> None:
         f"Authorized: {'yes' if _is_authorized(message) else 'no'}",
         parse_mode="Markdown",
     )
+
+
+@router.message(Command("ping"))
+async def cmd_ping(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    await message.answer("pong")
+
+
+@router.errors()
+async def on_error(event: ErrorEvent, bot: Bot) -> None:
+    logger.exception("Unhandled update error", exc_info=event.exception)
+    try:
+        await bot.send_message(
+            settings.MY_CHAT_ID,
+            f"⚠️ Ошибка обработки сообщения: {type(event.exception).__name__}: {event.exception}",
+        )
+    except Exception:
+        logger.exception("Failed to report update error")
 
 
 @router.message(Command("задачи"))

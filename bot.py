@@ -69,10 +69,7 @@ async def on_startup(bot: Bot) -> None:
 
 
 async def on_shutdown(bot: Bot) -> None:
-    try:
-        await bot.delete_webhook()
-    except Exception:
-        pass
+    logger.info("Shutdown: keeping Telegram webhook registered")
 
 
 def build_app() -> web.Application:
