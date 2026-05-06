@@ -14,7 +14,7 @@ from config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
-APP_VERSION = "2026-05-06-deploy-check"
+APP_VERSION = "2026-05-06-webhook-fix"
 
 
 async def health(_request: web.Request) -> web.Response:
