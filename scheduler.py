@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pytz
@@ -53,8 +54,16 @@ def schedule_reminder(reminder: Reminder) -> None:
             kwargs={"reminder_id": reminder.id, "content": content, "recurring": True},
         )
     elif reminder.remind_at:
-        if reminder.remind_at <= datetime.now(reminder.remind_at.tzinfo or _tz):
-            logger.info("Reminder %s already in the past — skipping", reminder.id)
+        now = datetime.now(reminder.remind_at.tzinfo or _tz)
+        if reminder.remind_at <= now:
+            missed_by = (now - reminder.remind_at).total_seconds()
+            if missed_by < 300:  # fire if missed by less than 5 min
+                logger.info("Reminder %s missed by %.0fs — firing now", reminder.id, missed_by)
+                asyncio.get_event_loop().create_task(
+                    _send_reminder(reminder.id, content, False)
+                )
+            else:
+                logger.info("Reminder %s too old (%.0fs) — skipping", reminder.id, missed_by)
             return
         _scheduler.add_job(
             _send_reminder,
