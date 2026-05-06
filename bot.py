@@ -58,9 +58,15 @@ async def _background_init(bot: Bot) -> None:
         scheduler.schedule_daily_digest(
             lambda: asyncio.create_task(handlers.send_daily_digest(bot))
         )
-        logger.info("Daily digest scheduled. TZ=%s", settings.TZ)
+        scheduler.schedule_weekly_report(
+            lambda: asyncio.create_task(handlers.send_weekly_report(bot))
+        )
+        scheduler.schedule_overdue_check(
+            lambda: asyncio.create_task(handlers.check_overdue_tasks(bot))
+        )
+        logger.info("Scheduled: daily digest, weekly report, overdue check. TZ=%s", settings.TZ)
     except Exception as e:
-        logger.error("Digest schedule failed (non-fatal): %s", e)
+        logger.error("Schedule setup failed (non-fatal): %s", e)
 
 
 async def on_startup(bot: Bot) -> None:

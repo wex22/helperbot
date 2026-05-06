@@ -18,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
 {
+  "is_conversational": true | false,
+  "reply": "<friendly reply in user's language if is_conversational=true, else omit>",
   "category": "task" | "thought" | "idea" | "reminder" | "note",
   "priority": "urgent" | "normal" | "someday",
   "title": "<short title ≤80 chars>",
   "tags": ["tag1", "tag2"],
-  "transcript": "<transcription if voice/photo, else omit>",
+  "transcript": "<if voice/photo: recognized text or image description, else omit>",
   "remind_at": "<ISO 8601 with tz offset, only for one-shot reminders, else omit>",
   "recurrence": "<APScheduler cron 'min hour day month dow', only for recurring, else omit>",
   "is_close_task_command": true | false,
@@ -38,23 +40,25 @@ def _system_prompt(history: list[Entry]) -> str:
         for e in history if e.created_at
     ) or "(no recent context)"
 
-    return f"""You are a personal assistant. Process one incoming message and return strict JSON only.
+    return f"""You are a smart personal assistant and second brain. You process messages and return strict JSON.
 
 Current local datetime: {now}
 User timezone: {settings.TZ}
 
-Recent context (last entries, newest first):
+Recent entries saved by user (newest first):
 {history_block}
 
 {_SCHEMA_HINT}
 
 Rules:
-- Be decisive. Return JSON only, no extra text.
-- Russian "напомни/напомнить" = reminder. "идея/мысль" = idea/thought. "надо/сделать/нужно" usually = task.
-- If the message is just venting/journal-like, category = thought.
-- Urgency cues: "срочно", "asap", "сегодня до", explicit deadline within 24h => urgent. "когда-нибудь" => someday. Otherwise normal.
-- Resolve relative time ("через 10 минут", "tomorrow at 9", "завтра вечером") against current datetime for remind_at.
-- is_close_task_command: true if user signals task completion ("сделал", "done", "готово")."""
+- Return JSON only. No extra text.
+- is_conversational=true when: user asks a question, wants advice, chats, says hi/thanks, or the message is clearly NOT a note/task/reminder to save.
+  When is_conversational=true: write a helpful, friendly reply in "reply" field (match user's language: Russian or English). Still fill category/title as best you can.
+- is_conversational=false when: user wants to save something (task, idea, reminder, note, thought).
+- Russian "напомни/напомнить" = reminder. "идея/мысль" = idea/thought. "надо/сделать/нужно" = task.
+- Urgency: "срочно/asap/сегодня до/deadline within 24h" => urgent. "когда-нибудь" => someday. Otherwise normal.
+- Resolve relative time ("через 10 минут", "tomorrow at 9") against current datetime for remind_at.
+- is_close_task_command=true when user signals completion ("сделал", "done", "готово", "выполнено")."""
 
 
 async def classify(
@@ -67,11 +71,11 @@ async def classify(
 
     if audio_bytes:
         transcript = await _transcribe(audio_bytes)
-        user_msg = f"New voice message (transcribed): {transcript}\n\nClassify it and put the transcription in the 'transcript' field."
+        user_msg = f"Voice message (transcribed): {transcript}\n\nProcess it: put transcription in 'transcript' field."
     elif image_bytes:
         return await _classify_image(image_bytes, content, system)
     else:
-        user_msg = f"New message:\n{content}"
+        user_msg = f"Message:\n{content}"
 
     resp = await _client.chat.completions.create(
         model=TEXT_MODEL,
@@ -112,7 +116,7 @@ async def _classify_image(image_bytes: bytes, caption: str, system: str) -> Clas
         },
         {
             "type": "text",
-            "text": f"Describe what you see in the image, put the description in 'transcript', then classify the message.{caption_part}",
+            "text": f"Describe what you see, put description in 'transcript', then classify.{caption_part}",
         },
     ]
 

@@ -212,6 +212,43 @@ async def get_week_entries() -> list[Entry]:
         return [_to_entry(row) for row in r.json()]
 
 
+async def search_entries(query: str, limit: int = 10) -> list[Entry]:
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "or": f"(content.ilike.*{query}*,title.ilike.*{query}*)",
+            "order": "created_at.desc",
+            "limit": limit,
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
+
+
+async def get_stats() -> dict:
+    async with _client() as c:
+        r_total = await c.get("/entries", params={"select": "category,status", "limit": 1000})
+        r_total.raise_for_status()
+        rows = r_total.json()
+
+    total = len(rows)
+    by_category: dict[str, int] = {}
+    open_tasks = 0
+    done_tasks = 0
+    for row in rows:
+        cat = row.get("category", "note")
+        by_category[cat] = by_category.get(cat, 0) + 1
+        if cat == "task":
+            if row.get("status") == "open":
+                open_tasks += 1
+            else:
+                done_tasks += 1
+    return {
+        "total": total,
+        "by_category": by_category,
+        "open_tasks": open_tasks,
+        "done_tasks": done_tasks,
+    }
+
+
 async def get_reminders_firing_today() -> list[Reminder]:
     async with _client() as c:
         now = datetime.now(timezone.utc)

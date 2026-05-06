@@ -2,13 +2,12 @@ import asyncio
 import io
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import ErrorEvent
-from aiogram.types import Message
+from aiogram.types import ErrorEvent, Message
 from dateutil import parser as dateparser
 
 import gemini_client
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 TAG_RE = re.compile(r"#([\wа-яА-ЯёЁ\-]+)", re.UNICODE)
-DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|done)\b\s*(\d+)?", re.IGNORECASE)
+DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|выполнено|done)\b\s*(\d+)?", re.IGNORECASE)
 
 
 def _is_authorized(message: Message) -> bool:
@@ -32,8 +31,17 @@ def _is_authorized(message: Message) -> bool:
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        f"Hi. Your chat id is `{message.chat.id}`.\n"
-        f"Authorized: {'yes' if _is_authorized(message) else 'no'}",
+        f"Привет! Я твой личный ассистент.\n\n"
+        f"Просто пиши мне что угодно — задачи, идеи, напоминания, вопросы.\n"
+        f"Или отправь голосовое / фото.\n\n"
+        f"Команды:\n"
+        f"/задачи — открытые задачи\n"
+        f"/итоги — сводка за неделю\n"
+        f"/поиск <слово> — поиск по записям\n"
+        f"/стат — твоя статистика\n"
+        f"/экспорт — все задачи текстом\n"
+        f"/done [id] — закрыть задачу\n\n"
+        f"Chat id: `{message.chat.id}`",
         parse_mode="Markdown",
     )
 
@@ -51,7 +59,7 @@ async def on_error(event: ErrorEvent, bot: Bot) -> None:
     try:
         await bot.send_message(
             settings.MY_CHAT_ID,
-            f"⚠️ Ошибка обработки сообщения: {type(event.exception).__name__}: {event.exception}",
+            f"⚠️ Ошибка: {type(event.exception).__name__}: {event.exception}",
         )
     except Exception:
         logger.exception("Failed to report update error")
@@ -63,13 +71,18 @@ async def cmd_tasks(message: Message) -> None:
         return
     tasks = await db.get_open_tasks()
     if not tasks:
-        await message.answer("Открытых задач нет.")
+        await message.answer("Открытых задач нет. Всё сделано 💪")
         return
-    lines = [
-        f"[{t.id}] {t.priority.value} · {t.title or t.content[:80]}"
-        for t in tasks
-    ]
-    await message.answer("\n".join(lines))
+    lines = [f"📋 *Открытые задачи ({len(tasks)}):*\n"]
+    for t in tasks:
+        age = ""
+        if t.created_at:
+            days = (datetime.now(timezone.utc) - t.created_at).days
+            if days > 0:
+                age = f" _{days}д_"
+        priority_icon = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}.get(t.priority.value, "")
+        lines.append(f"{priority_icon} [{t.id}] {t.title or t.content[:80]}{age}")
+    await message.answer("\n".join(lines), parse_mode="Markdown")
 
 
 @router.message(Command("done"))
@@ -77,7 +90,6 @@ async def cmd_done(message: Message) -> None:
     if not _is_authorized(message):
         return
     parts = (message.text or "").split(maxsplit=1)
-    closed: Optional[Entry]
     if len(parts) > 1 and parts[1].strip().isdigit():
         closed = await db.close_task(int(parts[1].strip()))
     else:
@@ -96,6 +108,56 @@ async def cmd_summary(message: Message) -> None:
     week = await db.get_week_entries()
     text = await gemini_client.summarize(today, week)
     await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(Command("поиск"))
+async def cmd_search(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer("Использование: /поиск <слово>")
+        return
+    query = parts[1].strip()
+    results = await db.search_entries(query)
+    if not results:
+        await message.answer(f"По запросу «{query}» ничего не найдено.")
+        return
+    lines = [f"🔍 *Результаты по «{query}»:*\n"]
+    for e in results:
+        date_str = e.created_at.strftime("%d.%m") if e.created_at else ""
+        lines.append(f"[{e.id}] {e.category.value} · {e.title or e.content[:80]} _{date_str}_")
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(Command("стат"))
+async def cmd_stats(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    stats = await db.get_stats()
+    cat_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝"}
+    lines = [f"📊 *Статистика:*\n", f"Всего записей: *{stats['total']}*\n"]
+    for cat, count in sorted(stats["by_category"].items(), key=lambda x: -x[1]):
+        icon = cat_icons.get(cat, "•")
+        lines.append(f"{icon} {cat}: {count}")
+    lines.append(f"\n✅ Задач закрыто: {stats['done_tasks']}")
+    lines.append(f"🔓 Задач открыто: {stats['open_tasks']}")
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(Command("экспорт"))
+async def cmd_export(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    tasks = await db.get_open_tasks()
+    if not tasks:
+        await message.answer("Открытых задач нет.")
+        return
+    lines = ["ОТКРЫТЫЕ ЗАДАЧИ\n"]
+    for t in tasks:
+        date_str = t.created_at.strftime("%Y-%m-%d") if t.created_at else ""
+        lines.append(f"[{t.id}] [{t.priority.value.upper()}] {t.title or t.content[:120]}  ({date_str})")
+    await message.answer("```\n" + "\n".join(lines) + "\n```", parse_mode="Markdown")
 
 
 @router.message(F.voice)
@@ -156,7 +218,7 @@ async def _process(
             content=content, history=history, audio_bytes=audio, image_bytes=image
         )
     except Exception:
-        logger.exception("Gemini classification failed")
+        logger.exception("Groq classification failed")
         await message.answer("⚠️ Не получилось обработать сообщение.")
         return
 
@@ -170,6 +232,10 @@ async def _process(
             await message.answer(f"✅ Закрыта: [{closed.id}] {closed.title or closed.content[:80]}")
         else:
             await message.answer("Не нашёл открытую задачу.")
+        return
+
+    if result.is_conversational and result.reply:
+        await message.answer(result.reply)
         return
 
     final_content = result.transcript or content
@@ -193,19 +259,14 @@ async def _process(
         )
     except Exception:
         logger.exception("Supabase insert failed")
-        await message.answer(
-            "⚠️ Я понял сообщение, но не смог сохранить его в Supabase.\n"
-            "Проверь `SUPABASE_URL` в Render: должен быть Project URL вида "
-            "`https://<project-ref>.supabase.co`.",
-            parse_mode="Markdown",
-        )
+        await message.answer("⚠️ Понял, но не смог сохранить. Проверь Supabase.")
         return
 
     asyncio.create_task(notion.create_note(entry))
 
     reminder_msg = ""
     if result.category == Category.REMINDER:
-        remind_at: Optional[datetime] = None
+        remind_at = None
         if result.remind_at:
             try:
                 remind_at = dateparser.isoparse(result.remind_at)
@@ -222,7 +283,7 @@ async def _process(
             )
             scheduler.schedule_reminder(reminder)
             if remind_at:
-                reminder_msg = f" · ⏰ {remind_at:%Y-%m-%d %H:%M}"
+                reminder_msg = f" · ⏰ {remind_at:%d.%m %H:%M}"
             elif result.recurrence:
                 reminder_msg = f" · 🔁 {result.recurrence}"
 
@@ -230,9 +291,14 @@ async def _process(
     if raw_kind in (RawKind.VOICE, RawKind.PHOTO) and result.transcript:
         transcript_preview = f"\n📝 _{result.transcript[:200]}_"
 
+    category_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝"}
+    priority_icons = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}
+    cat_icon = category_icons.get(result.category.value, "✅")
+    pri_icon = priority_icons.get(result.priority.value, "")
+
     await message.answer(
-        f"✅ {result.category.value} · {result.priority.value} · "
-        f"[{entry.id}] {entry.title}{reminder_msg}{transcript_preview}",
+        f"{cat_icon} Сохранено · {pri_icon} {result.priority.value} · "
+        f"[{entry.id}] _{entry.title}_{reminder_msg}{transcript_preview}",
         parse_mode="Markdown",
     )
 
@@ -245,10 +311,10 @@ async def send_daily_digest(bot: Bot) -> None:
 
     parts = ["☀️ *Доброе утро. Дайджест:*"]
     if open_tasks:
-        parts.append("\n*Открытые задачи*")
-        parts.extend(
-            f"  [{t.id}] {t.priority.value} · {t.title or t.content[:80]}" for t in open_tasks[:15]
-        )
+        parts.append(f"\n*Открытые задачи ({len(open_tasks)})*")
+        for t in open_tasks[:15]:
+            priority_icon = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}.get(t.priority.value, "")
+            parts.append(f"  {priority_icon} [{t.id}] {t.title or t.content[:80]}")
     if today_reminders:
         parts.append("\n*Напоминания на сегодня*")
         parts.extend(
@@ -261,3 +327,53 @@ async def send_daily_digest(bot: Bot) -> None:
         logger.exception("Digest summary failed")
 
     await bot.send_message(settings.MY_CHAT_ID, "\n".join(parts), parse_mode="Markdown")
+
+
+async def send_weekly_report(bot: Bot) -> None:
+    try:
+        stats = await db.get_stats()
+        week = await db.get_week_entries()
+        open_tasks = await db.get_open_tasks()
+
+        cat_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝"}
+        lines = ["📅 *Итоги недели:*\n"]
+        lines.append(f"Записей за неделю: *{len(week)}*")
+        lines.append(f"✅ Задач закрыто всего: {stats['done_tasks']}")
+        lines.append(f"🔓 Задач ещё открыто: {stats['open_tasks']}\n")
+
+        if week:
+            by_cat: dict[str, int] = {}
+            for e in week:
+                by_cat[e.category.value] = by_cat.get(e.category.value, 0) + 1
+            for cat, cnt in sorted(by_cat.items(), key=lambda x: -x[1]):
+                lines.append(f"{cat_icons.get(cat,'•')} {cat}: {cnt}")
+
+        if open_tasks:
+            urgent = [t for t in open_tasks if t.priority.value == "urgent"]
+            if urgent:
+                lines.append(f"\n🔴 *Срочные задачи:*")
+                for t in urgent[:5]:
+                    lines.append(f"  [{t.id}] {t.title or t.content[:60]}")
+
+        await bot.send_message(settings.MY_CHAT_ID, "\n".join(lines), parse_mode="Markdown")
+    except Exception:
+        logger.exception("Weekly report failed")
+
+
+async def check_overdue_tasks(bot: Bot) -> None:
+    try:
+        tasks = await db.get_open_tasks()
+        overdue = [
+            t for t in tasks
+            if t.created_at and (datetime.now(timezone.utc) - t.created_at).days >= 7
+            and t.priority.value != "someday"
+        ]
+        if not overdue:
+            return
+        lines = [f"⚠️ *{len(overdue)} задач висит больше недели:*\n"]
+        for t in overdue[:10]:
+            days = (datetime.now(timezone.utc) - t.created_at).days
+            lines.append(f"  [{t.id}] {t.title or t.content[:60]} — {days} дней")
+        await bot.send_message(settings.MY_CHAT_ID, "\n".join(lines), parse_mode="Markdown")
+    except Exception:
+        logger.exception("Overdue check failed")

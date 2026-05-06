@@ -78,6 +78,28 @@ def schedule_daily_digest(send_digest_callback) -> None:
     )
 
 
+def schedule_weekly_report(send_weekly_callback) -> None:
+    if _scheduler is None:
+        raise RuntimeError("scheduler.init(bot) must be called before scheduling")
+    _scheduler.add_job(
+        send_weekly_callback,
+        trigger=CronTrigger(day_of_week="sun", hour=20, minute=0, timezone=_tz),
+        id="weekly-report",
+        replace_existing=True,
+    )
+
+
+def schedule_overdue_check(check_overdue_callback) -> None:
+    if _scheduler is None:
+        raise RuntimeError("scheduler.init(bot) must be called before scheduling")
+    _scheduler.add_job(
+        check_overdue_callback,
+        trigger=CronTrigger(hour=10, minute=0, timezone=_tz),
+        id="overdue-check",
+        replace_existing=True,
+    )
+
+
 async def rehydrate() -> None:
     pending = await db.get_pending_reminders()
     for r in pending:
