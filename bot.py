@@ -19,11 +19,12 @@ async def health(_request: web.Request) -> web.Response:
     return web.Response(text="ok")
 
 
-async def on_startup(bot: Bot) -> None:
-    webhook_url = settings.WEBHOOK_URL.rstrip("/") + settings.WEBHOOK_PATH
-    logger.info("Setting webhook to %s", webhook_url)
+async def _background_init(bot: Bot) -> None:
+    """All network-dependent startup — runs after server is bound to port."""
+    # Give the event loop a moment before hitting external APIs
+    await asyncio.sleep(2)
 
-    # Retry webhook setup — Render sometimes has brief DNS lag on cold start
+    webhook_url = settings.WEBHOOK_URL.rstrip("/") + settings.WEBHOOK_PATH
     for attempt in range(5):
         try:
             await bot.set_webhook(
@@ -31,30 +32,32 @@ async def on_startup(bot: Bot) -> None:
                 secret_token=settings.WEBHOOK_SECRET,
                 drop_pending_updates=True,
             )
-            logger.info("Webhook set successfully")
+            logger.info("Webhook set to %s", webhook_url)
             break
         except Exception as e:
-            logger.warning("Webhook attempt %d failed: %s", attempt + 1, e)
-            if attempt < 4:
-                await asyncio.sleep(3)
-            else:
-                logger.error("Could not set webhook after 5 attempts — bot may not receive messages")
+            logger.warning("Webhook attempt %d/5 failed: %s", attempt + 1, e)
+            await asyncio.sleep(4)
 
     scheduler.init(bot)
 
     try:
         await scheduler.rehydrate()
+        logger.info("Reminders rehydrated")
     except Exception as e:
-        logger.error("Reminder rehydration failed (non-fatal): %s", e)
+        logger.error("Rehydrate failed (non-fatal): %s", e)
 
     try:
         scheduler.schedule_daily_digest(
             lambda: asyncio.create_task(handlers.send_daily_digest(bot))
         )
+        logger.info("Daily digest scheduled. TZ=%s", settings.TZ)
     except Exception as e:
-        logger.error("Daily digest scheduling failed (non-fatal): %s", e)
+        logger.error("Digest schedule failed (non-fatal): %s", e)
 
-    logger.info("Bot started. TZ=%s", settings.TZ)
+
+async def on_startup(bot: Bot) -> None:
+    # Fire-and-forget: server binds to port immediately, init happens in background
+    asyncio.create_task(_background_init(bot))
 
 
 async def on_shutdown(bot: Bot) -> None:
