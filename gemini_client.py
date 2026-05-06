@@ -131,6 +131,8 @@ async def classify(
         logger.error("Groq returned non-JSON: %r", raw)
         raise
 
+    # Strip null values so Pydantic falls back to model defaults
+    data = {k: v for k, v in data.items() if v is not None}
     return ClassificationResult.model_validate(data)
 
 
@@ -174,6 +176,7 @@ async def _classify_image(image_bytes: bytes, caption: str, system: str, chat_bu
         logger.error("Groq vision returned non-JSON: %r", raw)
         raise
 
+    data = {k: v for k, v in data.items() if v is not None}
     return ClassificationResult.model_validate(data)
 
 
