@@ -1,3 +1,5 @@
+import base64
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse
@@ -7,8 +9,35 @@ from httpx import AsyncClient as HttpxClient, ConnectError
 from config import settings
 from models import Category, Entry, Priority, RawKind, Reminder, Status
 
+def _project_ref_from_key(key: str) -> Optional[str]:
+    parts = key.split(".")
+    if len(parts) < 2:
+        return None
+
+    payload = parts[1].replace("-", "+").replace("_", "/")
+    payload += "=" * (-len(payload) % 4)
+    try:
+        data = json.loads(base64.b64decode(payload).decode("utf-8"))
+    except Exception:
+        return None
+    return data.get("ref")
+
+
+def _supabase_url_from_settings() -> str:
+    configured_url = settings.SUPABASE_URL.strip().rstrip("/")
+    configured_host = urlparse(configured_url).hostname
+    key_ref = _project_ref_from_key(settings.SUPABASE_KEY)
+
+    if key_ref:
+        expected_host = f"{key_ref}.supabase.co"
+        if configured_host != expected_host:
+            return f"https://{expected_host}"
+
+    return configured_url
+
+
 # Direct PostgREST calls — bypasses supabase-py auth init (which triggers sync httpx)
-_SUPABASE_URL = settings.SUPABASE_URL.strip().rstrip("/")
+_SUPABASE_URL = _supabase_url_from_settings()
 _SUPABASE_HOST = urlparse(_SUPABASE_URL).hostname or "(invalid SUPABASE_URL)"
 _BASE = f"{_SUPABASE_URL}/rest/v1"
 _HEADERS = {
