@@ -46,6 +46,7 @@ async def cmd_start(message: Message) -> None:
         f"Или отправь голосовое / фото.\n\n"
         f"Команды:\n"
         f"/задачи — открытые задачи\n"
+        f"/анализ — найти повторы и паттерны\n"
         f"/итоги — сводка за неделю\n"
         f"/поиск <слово> — поиск по записям\n"
         f"/стат — твоя статистика\n"
@@ -153,6 +154,25 @@ async def cmd_stats(message: Message) -> None:
     lines.append(f"\n✅ Задач закрыто: {stats['done_tasks']}")
     lines.append(f"🔓 Задач открыто: {stats['open_tasks']}")
     await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(Command("анализ"))
+async def cmd_analyze(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    await message.answer("🔍 Анализирую задачи...")
+    all_tasks = await db.get_open_tasks()
+    done = await db.get_week_entries()
+    all_entries = list({e.id: e for e in [*all_tasks, *done]}.values())
+    if not all_entries:
+        await message.answer("Нет задач для анализа. Сначала добавь несколько.")
+        return
+    try:
+        result = await gemini_client.analyze_tasks(all_entries)
+        await message.answer(result, parse_mode="Markdown")
+    except Exception:
+        logger.exception("Analyze failed")
+        await message.answer("⚠️ Не удалось проанализировать.")
 
 
 @router.message(Command("экспорт"))
