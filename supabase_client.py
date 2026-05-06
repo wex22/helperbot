@@ -1,19 +1,23 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from supabase._async.client import AsyncClient, create_client as acreate_client
+from httpx import AsyncClient as HttpxClient
 
 from config import settings
 from models import Category, Entry, Priority, RawKind, Reminder, Status
 
-_client: Optional[AsyncClient] = None
+# Direct PostgREST calls — bypasses supabase-py auth init (which triggers sync httpx)
+_BASE = f"{settings.SUPABASE_URL}/rest/v1"
+_HEADERS = {
+    "apikey": settings.SUPABASE_KEY,
+    "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+}
 
 
-async def get_client() -> AsyncClient:
-    global _client
-    if _client is None:
-        _client = await acreate_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-    return _client
+def _client() -> HttpxClient:
+    return HttpxClient(base_url=_BASE, headers=_HEADERS, timeout=10)
 
 
 def _to_entry(row: dict) -> Entry:
@@ -44,117 +48,130 @@ def _to_reminder(row: dict) -> Reminder:
 
 
 async def insert_entry(entry: Entry) -> Entry:
-    db = await get_client()
-    payload = {
-        "content": entry.content,
-        "title": entry.title,
-        "category": entry.category.value,
-        "priority": entry.priority.value,
-        "status": entry.status.value,
-        "tags": entry.tags,
-        "source": entry.source,
-        "raw_kind": entry.raw_kind.value,
-    }
-    res = await db.table("entries").insert(payload).execute()
-    return _to_entry(res.data[0])
+    async with _client() as c:
+        r = await c.post("/entries", json={
+            "content": entry.content,
+            "title": entry.title,
+            "category": entry.category.value,
+            "priority": entry.priority.value,
+            "status": entry.status.value,
+            "tags": entry.tags,
+            "source": entry.source,
+            "raw_kind": entry.raw_kind.value,
+        })
+        r.raise_for_status()
+        return _to_entry(r.json()[0])
 
 
 async def get_recent(limit: int = 20) -> list[Entry]:
-    db = await get_client()
-    res = await db.table("entries").select("*").order("created_at", desc=True).limit(limit).execute()
-    return [_to_entry(r) for r in res.data]
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "order": "created_at.desc",
+            "limit": limit,
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
 
 
 async def get_open_tasks() -> list[Entry]:
-    db = await get_client()
-    res = (
-        await db.table("entries")
-        .select("*")
-        .eq("category", Category.TASK.value)
-        .eq("status", Status.OPEN.value)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return [_to_entry(r) for r in res.data]
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "category": f"eq.{Category.TASK.value}",
+            "status": f"eq.{Status.OPEN.value}",
+            "order": "created_at.desc",
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
 
 
 async def close_task(task_id: int) -> Optional[Entry]:
-    db = await get_client()
-    res = (
-        await db.table("entries")
-        .update({"status": Status.DONE.value})
-        .eq("id", task_id)
-        .eq("category", Category.TASK.value)
-        .execute()
-    )
-    return _to_entry(res.data[0]) if res.data else None
+    async with _client() as c:
+        r = await c.patch(
+            "/entries",
+            params={"id": f"eq.{task_id}", "category": f"eq.{Category.TASK.value}"},
+            json={"status": Status.DONE.value},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return _to_entry(data[0]) if data else None
 
 
 async def close_latest_open_task() -> Optional[Entry]:
-    db = await get_client()
-    res = (
-        await db.table("entries")
-        .select("*")
-        .eq("category", Category.TASK.value)
-        .eq("status", Status.OPEN.value)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if not res.data:
-        return None
-    return await close_task(res.data[0]["id"])
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "category": f"eq.{Category.TASK.value}",
+            "status": f"eq.{Status.OPEN.value}",
+            "order": "created_at.desc",
+            "limit": 1,
+        })
+        r.raise_for_status()
+        data = r.json()
+        if not data:
+            return None
+        return await close_task(data[0]["id"])
 
 
 async def insert_reminder(reminder: Reminder) -> Reminder:
-    db = await get_client()
-    payload = {
-        "entry_id": reminder.entry_id,
-        "remind_at": reminder.remind_at.isoformat() if reminder.remind_at else None,
-        "recurrence": reminder.recurrence,
-        "fired": False,
-    }
-    res = await db.table("reminders").insert(payload).execute()
-    row = res.data[0]
-    row["entries"] = {"content": reminder.content} if reminder.content else None
-    return _to_reminder(row)
+    async with _client() as c:
+        r = await c.post("/reminders", json={
+            "entry_id": reminder.entry_id,
+            "remind_at": reminder.remind_at.isoformat() if reminder.remind_at else None,
+            "recurrence": reminder.recurrence,
+            "fired": False,
+        })
+        r.raise_for_status()
+        row = r.json()[0]
+        row["entries"] = {"content": reminder.content} if reminder.content else None
+        return _to_reminder(row)
 
 
 async def get_pending_reminders() -> list[Reminder]:
-    db = await get_client()
-    res = await db.table("reminders").select("*, entries(content, title)").eq("fired", False).execute()
-    return [_to_reminder(r) for r in res.data]
+    async with _client() as c:
+        r = await c.get("/reminders", params={
+            "fired": "eq.false",
+            "select": "*,entries(content,title)",
+        })
+        r.raise_for_status()
+        return [_to_reminder(row) for row in r.json()]
 
 
 async def mark_reminder_fired(reminder_id: int) -> None:
-    db = await get_client()
-    await db.table("reminders").update({"fired": True}).eq("id", reminder_id).execute()
+    async with _client() as c:
+        r = await c.patch("/reminders", params={"id": f"eq.{reminder_id}"}, json={"fired": True})
+        r.raise_for_status()
 
 
 async def get_today_entries() -> list[Entry]:
-    db = await get_client()
-    start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    res = await db.table("entries").select("*").gte("created_at", start).order("created_at", desc=True).execute()
-    return [_to_entry(r) for r in res.data]
+    async with _client() as c:
+        start = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        r = await c.get("/entries", params={
+            "created_at": f"gte.{start}",
+            "order": "created_at.desc",
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
 
 
 async def get_week_entries() -> list[Entry]:
-    db = await get_client()
-    start = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    res = await db.table("entries").select("*").gte("created_at", start).order("created_at", desc=True).execute()
-    return [_to_entry(r) for r in res.data]
+    async with _client() as c:
+        start = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        r = await c.get("/entries", params={
+            "created_at": f"gte.{start}",
+            "order": "created_at.desc",
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
 
 
 async def get_reminders_firing_today() -> list[Reminder]:
-    db = await get_client()
-    now = datetime.now(timezone.utc)
-    end = (now + timedelta(hours=24)).isoformat()
-    res = (
-        await db.table("reminders")
-        .select("*, entries(content, title)")
-        .eq("fired", False)
-        .gte("remind_at", now.isoformat())
-        .lte("remind_at", end)
-        .execute()
-    )
-    return [_to_reminder(r) for r in res.data]
+    async with _client() as c:
+        now = datetime.now(timezone.utc)
+        end = (now + timedelta(hours=24)).isoformat()
+        r = await c.get("/reminders", params={
+            "fired": "eq.false",
+            "remind_at": f"gte.{now.isoformat()}",
+            "and": f"(remind_at.lte.{end})",
+            "select": "*,entries(content,title)",
+        })
+        r.raise_for_status()
+        return [_to_reminder(row) for row in r.json()]
