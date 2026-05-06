@@ -23,6 +23,16 @@ router = Router()
 TAG_RE = re.compile(r"#([\wа-яА-ЯёЁ\-]+)", re.UNICODE)
 DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|выполнено|done)\b\s*(\d+)?", re.IGNORECASE)
 
+# Short-term conversation memory (last 8 messages = 4 exchanges)
+_chat_buffer: list[dict] = []
+_MAX_BUFFER = 8
+
+
+def _buf_add(role: str, text: str) -> None:
+    _chat_buffer.append({"role": role, "text": text[:300]})
+    if len(_chat_buffer) > _MAX_BUFFER:
+        _chat_buffer.pop(0)
+
 
 def _is_authorized(message: Message) -> bool:
     return message.chat.id == settings.MY_CHAT_ID
@@ -315,9 +325,12 @@ async def _process(
         logger.exception("Supabase history lookup failed")
         history = []
 
+    _buf_add("user", content or "[voice/photo]")
+
     try:
         result: ClassificationResult = await gemini_client.classify(
-            content=content, history=history, audio_bytes=audio, image_bytes=image
+            content=content, history=history, chat_buffer=list(_chat_buffer),
+            audio_bytes=audio, image_bytes=image
         )
     except Exception:
         logger.exception("Groq classification failed")
@@ -337,6 +350,7 @@ async def _process(
         return
 
     if result.is_conversational and result.reply:
+        _buf_add("bot", result.reply)
         await message.answer(result.reply)
         return
 
@@ -398,11 +412,12 @@ async def _process(
     cat_icon = category_icons.get(result.category.value, "✅")
     pri_icon = priority_icons.get(result.priority.value, "")
 
-    await message.answer(
+    reply_text = (
         f"{cat_icon} Сохранено · {pri_icon} {result.priority.value} · "
-        f"[{entry.id}] _{entry.title}_{reminder_msg}{transcript_preview}",
-        parse_mode="Markdown",
+        f"[{entry.id}] _{entry.title}_{reminder_msg}{transcript_preview}"
     )
+    _buf_add("bot", reply_text)
+    await message.answer(reply_text, parse_mode="Markdown")
 
 
 async def send_daily_digest(bot: Bot) -> None:

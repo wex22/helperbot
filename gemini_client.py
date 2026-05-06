@@ -32,33 +32,56 @@ _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
 }"""
 
 
-def _system_prompt(history: list[Entry]) -> str:
+def _system_prompt(history: list[Entry], chat_buffer: list[dict]) -> str:
     now = datetime.now().astimezone().isoformat()
     history_block = "\n".join(
         f"- [{e.created_at:%Y-%m-%d %H:%M}] ({e.category.value}/{e.priority.value}/{e.status.value}) "
         f"#{e.id} {e.title or e.content[:80]}"
         for e in history if e.created_at
-    ) or "(no recent context)"
+    ) or "(none)"
 
-    return f"""You are a smart personal assistant and second brain. You process messages and return strict JSON.
+    buffer_block = ""
+    if chat_buffer:
+        buffer_block = "\nRecent conversation (last messages):\n" + "\n".join(
+            f"  {'User' if m['role'] == 'user' else 'Bot'}: {m['text'][:200]}"
+            for m in chat_buffer
+        )
+
+    return f"""You are a smart personal assistant. You process messages and return strict JSON.
 
 Current local datetime: {now}
 User timezone: {settings.TZ}
-
-Recent entries saved by user (newest first):
+{buffer_block}
+Recent saved entries (newest first):
 {history_block}
 
 {_SCHEMA_HINT}
 
-Rules:
+CRITICAL RULES — read carefully:
 - Return JSON only. No extra text.
-- is_conversational=true ONLY when: user directly asks a question, wants advice, says hi/thanks, or clearly just wants to chat. NOT for: links, IDs, technical strings, random words, short nouns.
-  When is_conversational=true: write a short, helpful reply in "reply" field (match user's language). Do NOT paste long lists unless user explicitly asks "what can you do" or "что умеешь".
-- is_conversational=false when: user wants to save something (task, idea, reminder, note, thought), OR sends a link/ID/technical string/random content — save it as a note instead.
-- Russian "напомни/напомнить" = reminder. "идея/мысль" = idea/thought. "надо/сделать/нужно" = task.
-- Urgency: "срочно/asap/сегодня до/deadline within 24h" => urgent. "когда-нибудь" => someday. Otherwise normal.
+
+WHEN TO SAVE (is_conversational=false):
+  Save ONLY when the user EXPLICITLY wants to save something:
+  • Uses save words: "добавь", "сохрани", "запомни", "запиши", "отметь", "add", "save", "note"
+  • Clear task: "надо сделать X", "нужно X", "сделать X до Y"
+  • Clear reminder: "напомни мне...", "remind me..."
+  • Clear idea label: "идея:", "idea:"
+  • Clear recurring reminder: "каждый день/неделю..."
+
+WHEN NOT TO SAVE (is_conversational=true):
+  • Casual chat, greetings, thanks, questions
+  • Random words, links, IDs, numbers sent without context
+  • Anything ambiguous — when in doubt, ask or reply conversationally
+  • Short phrases that don't clearly express intent to save
+
+When is_conversational=true: reply briefly and naturally in the user's language (RU/EN).
+Use recent conversation context to understand what the user means.
+Do NOT show full capability list unless user explicitly asks "что умеешь" / "what can you do".
+
+- Russian "напомни/напомнить" = reminder. "надо/нужно/сделать" = task. "идея/мысль" = idea/thought.
+- Urgency: "срочно/asap" => urgent. "когда-нибудь" => someday. Otherwise normal.
 - Resolve relative time ("через 10 минут", "tomorrow at 9") against current datetime for remind_at.
-- is_close_task_command=true when user signals completion ("сделал", "done", "готово", "выполнено").
+- is_close_task_command=true when: "сделал", "done", "готово", "выполнено"."""
 
 IMPORTANT — when user asks what you can do ("что ты умеешь", "что ты можешь", "как ты работаешь", "помощь", "help"):
 Set is_conversational=true and reply with EXACTLY this (adapt tone, keep all points):
@@ -100,16 +123,17 @@ Set is_conversational=true and reply with EXACTLY this (adapt tone, keep all poi
 async def classify(
     content: str,
     history: list[Entry],
+    chat_buffer: Optional[list[dict]] = None,
     audio_bytes: Optional[bytes] = None,
     image_bytes: Optional[bytes] = None,
 ) -> ClassificationResult:
-    system = _system_prompt(history)
+    system = _system_prompt(history, chat_buffer or [])
 
     if audio_bytes:
         transcript = await _transcribe(audio_bytes)
         user_msg = f"Voice message (transcribed): {transcript}\n\nProcess it: put transcription in 'transcript' field."
     elif image_bytes:
-        return await _classify_image(image_bytes, content, system)
+        return await _classify_image(image_bytes, content, system, chat_buffer or [])
     else:
         user_msg = f"Message:\n{content}"
 
@@ -142,7 +166,7 @@ async def _transcribe(audio_bytes: bytes) -> str:
     return transcription.strip() if isinstance(transcription, str) else transcription.text.strip()
 
 
-async def _classify_image(image_bytes: bytes, caption: str, system: str) -> ClassificationResult:
+async def _classify_image(image_bytes: bytes, caption: str, system: str, chat_buffer: list[dict]) -> ClassificationResult:
     image_b64 = base64.b64encode(image_bytes).decode()
     caption_part = f"\nUser caption: {caption}" if caption else ""
     user_msg = [
