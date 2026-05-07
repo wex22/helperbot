@@ -6,667 +6,772 @@
 <title>WEX MIND</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root {
-  --bg: var(--tg-theme-bg-color, #17212b);
-  --bg2: var(--tg-theme-secondary-bg-color, #1c2733);
-  --card: #242f3d;
-  --card2: #2b3a4a;
-  --text: var(--tg-theme-text-color, #ffffff);
-  --sub: var(--tg-theme-hint-color, #8d9ba8);
-  --link: var(--tg-theme-link-color, #4c9bf7);
-  --accent: var(--tg-theme-button-color, #4c9bf7);
-  --accent-text: var(--tg-theme-button-text-color, #ffffff);
-  --urgent: #ff453a;
-  --normal: #ffd60a;
-  --someday: #98a2b3;
-  --green: #30d158;
-  --red: #ff453a;
-  --orange: #ff9f0a;
-  --purple: #bf5af2;
+:root{
+  --bg:var(--tg-theme-bg-color,#17212b);
+  --bg2:var(--tg-theme-secondary-bg-color,#1c2733);
+  --card:#242f3d;--card2:#2b3a4a;
+  --text:var(--tg-theme-text-color,#fff);
+  --sub:var(--tg-theme-hint-color,#8d9ba8);
+  --link:var(--tg-theme-link-color,#4c9bf7);
+  --accent:var(--tg-theme-button-color,#4c9bf7);
+  --accent-t:var(--tg-theme-button-text-color,#fff);
+  --urgent:#ff453a;--normal:#ffd60a;--someday:#98a2b3;
+  --green:#30d158;--red:#ff453a;--orange:#ff9f0a;--purple:#bf5af2;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
-input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overscroll-behavior: none; padding-bottom: 90px; }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overscroll-behavior:none;padding-bottom:110px}
 
-/* ── Header ───────────────────────────────────────────────────── */
-.header { padding: 18px 16px 10px; }
-.header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.h-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-.h-sub { color: var(--sub); font-size: 13px; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
-.h-sub b { color: var(--text); font-weight: 600; }
-.h-sub .urgent { color: var(--urgent); }
-.h-actions { display: flex; gap: 8px; }
-.icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--card); border: none; color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.icon-btn:active { transform: scale(.92); }
+/* Header */
+.hdr{padding:16px 16px 8px;display:flex;align-items:center;justify-content:space-between}
+.hdr-l h1{font-size:20px;font-weight:700;letter-spacing:-.5px}
+.hdr-l p{color:var(--sub);font-size:12px;margin-top:2px}
+.hdr-r{display:flex;gap:6px}
+.icon-btn{width:34px;height:34px;border-radius:50%;background:var(--card);border:none;color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .1s}
+.icon-btn:active{transform:scale(.88)}
 
-/* ── Search ───────────────────────────────────────────────────── */
-.search-wrap { padding: 0 16px 8px; }
-.search-input { width: 100%; background: var(--card); border: none; border-radius: 12px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; }
-.search-input::placeholder { color: var(--sub); }
+/* Search */
+.srch-wrap{padding:0 16px 6px;display:none}
+.srch{width:100%;background:var(--card);border:none;border-radius:12px;padding:9px 14px;color:var(--text);font-size:14px;outline:none}
+.srch::placeholder{color:var(--sub)}
 
-/* ── Tabs ─────────────────────────────────────────────────────── */
-.tabs { display: flex; padding: 4px 12px 8px; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.tabs::-webkit-scrollbar { display: none; }
-.tab { padding: 7px 14px; border-radius: 18px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; background: var(--card); color: var(--sub); transition: all .15s; display: flex; align-items: center; gap: 5px; }
-.tab.active { background: var(--accent); color: var(--accent-text); }
-.tab .badge-num { background: rgba(255,255,255,.18); padding: 1px 6px; border-radius: 9px; font-size: 11px; }
+/* Tabs */
+.tabs{display:flex;padding:4px 12px 6px;gap:5px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:6px 12px;border-radius:18px;border:none;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;background:var(--card);color:var(--sub);display:flex;align-items:center;gap:4px;transition:all .15s}
+.tab.active{background:var(--accent);color:var(--accent-t)}
+.bn{background:rgba(255,255,255,.18);padding:1px 5px;border-radius:8px;font-size:10px}
 
-/* ── Sub-filter (priority) ────────────────────────────────────── */
-.subfilter { display: flex; padding: 0 16px 8px; gap: 6px; }
-.chip { padding: 5px 12px; border-radius: 14px; border: 1px solid transparent; font-size: 12px; cursor: pointer; background: transparent; color: var(--sub); }
-.chip.active { background: var(--card); color: var(--text); border-color: rgba(255,255,255,.06); }
+/* Subfilters */
+.subf{display:flex;padding:0 14px 6px;gap:5px;flex-wrap:wrap}
+.chip{padding:4px 10px;border-radius:12px;border:1px solid transparent;font-size:11px;cursor:pointer;background:transparent;color:var(--sub)}
+.chip.on{background:var(--card);color:var(--text);border-color:rgba(255,255,255,.07)}
+.tag-chips{display:flex;padding:0 14px 6px;gap:5px;overflow-x:auto;scrollbar-width:none;display:none}
+.tag-chips::-webkit-scrollbar{display:none}
+.tag-chip{padding:3px 9px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--sub);font-size:11px;cursor:pointer;white-space:nowrap}
+.tag-chip.on{background:rgba(76,155,247,.2);color:var(--link);border-color:var(--link)}
 
-/* ── List ─────────────────────────────────────────────────────── */
-.section { padding: 4px 16px; }
-.day-header { font-size: 11px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin: 14px 0 6px; font-weight: 600; }
+/* List */
+.list{padding:2px 14px}
+.day-h{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.6px;margin:12px 0 5px;font-weight:600}
 
-.card { background: var(--card); border-radius: 14px; padding: 12px 12px 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; transition: transform .25s ease, opacity .25s ease, max-height .25s; overflow: hidden; position: relative; }
-.card.removing { transform: translateX(110%); opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; }
-.card.expanded { background: var(--card2); }
-.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
-.dot.urgent { background: var(--urgent); box-shadow: 0 0 8px rgba(255,69,58,.5); }
-.dot.normal { background: var(--normal); }
-.dot.someday { background: var(--someday); }
+/* Card */
+.card{background:var(--card);border-radius:13px;margin-bottom:7px;position:relative;overflow:hidden;transition:transform .25s,opacity .25s,max-height .25s}
+.card.removing{transform:translateX(120%);opacity:0;max-height:0;margin:0}
+.card-inner{display:flex;gap:8px;align-items:flex-start;padding:12px 12px 12px 13px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.dot.urgent{background:var(--urgent);box-shadow:0 0 8px rgba(255,69,58,.5)}
+.dot.normal{background:var(--normal)}
+.dot.someday{background:var(--someday)}
+.cbody{flex:1;min-width:0;cursor:pointer}
+.ctitle{font-size:14px;line-height:1.35;word-break:break-word}
+.cmeta{display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap}
+.badge{padding:2px 7px;border-radius:7px;font-size:10px;font-weight:500;display:inline-flex;align-items:center;gap:2px;cursor:pointer}
+.bc-task{background:rgba(76,155,247,.18);color:#4c9bf7}
+.bc-reminder{background:rgba(255,159,10,.18);color:var(--orange)}
+.bc-idea{background:rgba(191,90,242,.18);color:var(--purple)}
+.bc-thought{background:rgba(141,155,168,.18);color:var(--sub)}
+.bc-note{background:rgba(48,209,88,.15);color:var(--green)}
+.bc-habit{background:rgba(191,90,242,.18);color:var(--purple)}
+.bt{background:rgba(255,159,10,.16);color:var(--orange);font-weight:600}
+.br{background:rgba(191,90,242,.16);color:var(--purple)}
+.ba{background:rgba(141,155,168,.10);color:var(--sub)}
+.bd{background:rgba(255,69,58,.18);color:var(--red);font-weight:600}
+.btag{background:rgba(76,155,247,.10);color:var(--link)}
 
-.card-body { flex: 1; min-width: 0; cursor: pointer; }
-.card-title { font-size: 15px; line-height: 1.35; word-break: break-word; }
-.card-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.badge { padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
-.badge-cat-task     { background: rgba(76,155,247,.18); color: #4c9bf7; }
-.badge-cat-reminder { background: rgba(255,159,10,.18); color: var(--orange); }
-.badge-cat-idea     { background: rgba(191,90,242,.18); color: var(--purple); }
-.badge-cat-thought  { background: rgba(141,155,168,.18); color: var(--sub); }
-.badge-cat-note     { background: rgba(48,209,88,.15); color: var(--green); }
-.badge-time { background: rgba(255,159,10,.16); color: var(--orange); font-weight: 600; }
-.badge-recur { background: rgba(191,90,242,.16); color: var(--purple); }
-.badge-age  { background: rgba(141,155,168,.10); color: var(--sub); }
+/* Swipe bg */
+.swipe-left-bg,.swipe-right-bg{position:absolute;inset:0;display:flex;align-items:center;padding:0 20px;opacity:0;transition:opacity .15s;pointer-events:none}
+.swipe-left-bg{background:rgba(48,209,88,.25);justify-content:flex-start;color:var(--green);font-size:20px}
+.swipe-right-bg{background:rgba(255,69,58,.25);justify-content:flex-end;color:var(--red);font-size:20px}
 
-.card-actions { display: flex; flex-direction: column; gap: 6px; }
-.btn-icon { width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: transform .1s; padding: 0; }
-.btn-icon:active { transform: scale(.85); }
-.btn-check { background: rgba(48,209,88,.18); color: var(--green); }
-.btn-trash { background: rgba(255,69,58,.13); color: var(--red); }
-.btn-edit  { background: rgba(76,155,247,.18); color: var(--link); }
+.cactions{display:flex;flex-direction:column;gap:5px}
+.btn-i{width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:transform .1s;padding:0}
+.btn-i:active{transform:scale(.85)}
+.bi-check{background:rgba(48,209,88,.18);color:var(--green)}
+.bi-edit{background:rgba(76,155,247,.18);color:var(--link)}
 
-/* expanded panel */
-.card-expand { width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); display: none; flex-direction: column; gap: 8px; }
-.card.expanded .card-expand { display: flex; }
-.card-expand textarea { width: 100%; background: var(--bg); border: none; border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px; resize: none; outline: none; min-height: 60px; font-family: inherit; }
-.expand-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.mini-chip { padding: 5px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: var(--bg); color: var(--sub); font-size: 12px; cursor: pointer; }
-.mini-chip.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-.expand-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-.btn-sm { padding: 7px 14px; border-radius: 9px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
-.btn-primary { background: var(--accent); color: var(--accent-text); }
-.btn-secondary { background: var(--card); color: var(--text); }
+/* Expand panel */
+.cexpand{width:100%;padding:10px 13px 12px;border-top:1px solid rgba(255,255,255,.07);display:none;flex-direction:column;gap:7px}
+.card.expanded .cexpand{display:flex}
+.cexpand textarea{width:100%;background:var(--bg);border:none;border-radius:10px;padding:9px 11px;color:var(--text);font-size:13px;resize:none;outline:none;min-height:56px;font-family:inherit}
+.mchips{display:flex;gap:5px;flex-wrap:wrap}
+.mc{padding:4px 9px;border-radius:10px;border:1px solid rgba(255,255,255,.07);background:var(--bg);color:var(--sub);font-size:11px;cursor:pointer}
+.mc.on{background:var(--accent);color:var(--accent-t);border-color:transparent}
+.exp-actions{display:flex;gap:6px;justify-content:flex-end}
+.btn-sm{padding:6px 13px;border-radius:8px;border:none;font-size:12px;font-weight:500;cursor:pointer}
+.btn-p{background:var(--accent);color:var(--accent-t)}
+.btn-s{background:var(--card2);color:var(--text)}
 
-/* snooze row for reminder cards */
-.snooze-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.snooze-btn { padding: 5px 10px; border-radius: 10px; border: none; background: rgba(255,159,10,.15); color: var(--orange); font-size: 12px; cursor: pointer; font-weight: 500; }
-.snooze-btn:active { transform: scale(.95); }
+/* Snooze */
+.snooze-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.snbtn{padding:4px 9px;border-radius:9px;border:none;background:rgba(255,159,10,.14);color:var(--orange);font-size:11px;cursor:pointer;font-weight:500}
+.snbtn:active{transform:scale(.93)}
 
-/* ── Empty / loading ──────────────────────────────────────────── */
-.empty { text-align: center; padding: 60px 24px; }
-.empty-icon { font-size: 52px; margin-bottom: 14px; }
-.empty p { color: var(--sub); font-size: 16px; }
-.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,.2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-wrap { display: flex; justify-content: center; padding: 60px; }
+/* Due badge */
+.due-ok{background:rgba(255,159,10,.18);color:var(--orange)}
+.due-over{background:rgba(255,69,58,.2);color:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
-/* ── FAB ─────────────────────────────────────────────────────── */
-.fab { position: fixed; bottom: 20px; right: 18px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); border: none; color: var(--accent-text); font-size: 28px; cursor: pointer; box-shadow: 0 6px 20px rgba(76,155,247,.45); display: flex; align-items: center; justify-content: center; z-index: 100; transition: transform .15s; }
-.fab:active { transform: scale(.92); }
+/* Stats tab */
+.stats-wrap{padding:12px 14px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:12px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:4px}
+.stat-num{font-size:26px;font-weight:700}
+.stat-lbl{font-size:11px;color:var(--sub)}
+.stat-bar-wrap{background:var(--card);border-radius:12px;padding:14px}
+.stat-bar-title{font-size:12px;color:var(--sub);margin-bottom:10px}
+.sbar{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.sbar-lbl{font-size:12px;width:80px;flex-shrink:0}
+.sbar-track{flex:1;background:rgba(255,255,255,.08);border-radius:6px;height:6px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:6px;transition:width .4s}
+.sbar-num{font-size:11px;color:var(--sub);width:24px;text-align:right}
+.habits-wrap{background:var(--card);border-radius:12px;padding:14px;margin-top:8px}
+.habit-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.habit-row:last-child{border:none}
+.habit-name{font-size:13px}
+.habit-streak{font-size:12px;color:var(--orange)}
+.habit-btn{padding:5px 12px;border-radius:9px;border:none;background:rgba(48,209,88,.18);color:var(--green);font-size:12px;cursor:pointer}
 
-/* ── Bottom sheet ─────────────────────────────────────────────── */
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200; opacity: 0; pointer-events: none; transition: opacity .25s; }
-.overlay.show { opacity: 1; pointer-events: all; }
+/* Quick-add bar */
+.qabar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid rgba(255,255,255,.06);padding:8px 12px;display:flex;gap:8px;align-items:center;z-index:90;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.qa-input{flex:1;background:var(--bg);border:none;border-radius:10px;padding:9px 12px;color:var(--text);font-size:14px;outline:none}
+.qa-input::placeholder{color:var(--sub)}
+.qa-send{width:36px;height:36px;border-radius:50%;background:var(--accent);border:none;color:var(--accent-t);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.qa-send:active{transform:scale(.9)}
+.qa-expand-btn{width:36px;height:36px;border-radius:50%;background:var(--card2);border:none;color:var(--sub);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
-.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-radius: 22px 22px 0 0; padding: 12px 16px 28px; z-index: 300; transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); max-height: 90vh; overflow-y: auto; }
-.sheet.show { transform: translateY(0); }
-.handle { width: 38px; height: 4px; background: var(--sub); border-radius: 2px; margin: 0 auto 14px; opacity: .5; }
-.sheet h3 { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
-.field { width: 100%; background: var(--bg); border: none; border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: 15px; outline: none; font-family: inherit; margin-bottom: 10px; }
-textarea.field { min-height: 80px; resize: none; }
-.label { font-size: 12px; color: var(--sub); margin: 6px 0 6px 4px; }
-.cat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
-.cat-btn { padding: 9px 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,.06); background: var(--bg); color: var(--sub); font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.cat-btn .em { font-size: 18px; }
-.cat-btn.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-.pri-row { display: flex; gap: 6px; margin-bottom: 12px; }
-.pri-btn { flex: 1; padding: 9px; border-radius: 10px; border: 1px solid rgba(255,255,255,.06); background: var(--bg); color: var(--sub); font-size: 12px; cursor: pointer; }
-.pri-btn.on.urgent  { background: rgba(255,69,58,.2); color: var(--urgent); border-color: var(--urgent); }
-.pri-btn.on.normal  { background: rgba(255,214,10,.2); color: var(--normal); border-color: var(--normal); }
-.pri-btn.on.someday { background: rgba(152,162,179,.2); color: var(--text); border-color: var(--someday); }
-.btn-add { width: 100%; padding: 14px; background: var(--accent); color: var(--accent-text); border: none; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
-.btn-add:active { opacity: .8; }
+/* FAB (hidden when quick-add focused) */
+.fab{position:fixed;bottom:72px;right:16px;width:50px;height:50px;border-radius:50%;background:var(--accent);border:none;color:var(--accent-t);font-size:26px;cursor:pointer;box-shadow:0 6px 18px rgba(76,155,247,.4);display:none;align-items:center;justify-content:center;z-index:95}
+.fab:active{transform:scale(.92)}
 
-.time-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.time-quick { padding: 7px 12px; border-radius: 10px; background: var(--bg); border: 1px solid rgba(255,255,255,.06); color: var(--sub); font-size: 12px; cursor: pointer; }
-.time-quick.on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-.dt-input { width: 100%; background: var(--bg); border: none; border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 10px; color-scheme: dark; }
+/* Sheet */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.show{opacity:1;pointer-events:all}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:22px 22px 0 0;padding:12px 16px 28px;z-index:300;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:90vh;overflow-y:auto}
+.sheet.show{transform:translateY(0)}
+.handle{width:38px;height:4px;background:var(--sub);border-radius:2px;margin:0 auto 14px;opacity:.4}
+.sh-title{font-size:16px;font-weight:700;margin-bottom:13px}
+.field{width:100%;background:var(--bg);border:none;border-radius:12px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;font-family:inherit;margin-bottom:9px}
+textarea.field{min-height:76px;resize:none}
+.lbl{font-size:11px;color:var(--sub);margin:5px 0 5px 3px}
+.cat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:11px}
+.cat-btn{padding:8px 3px;border-radius:9px;border:1px solid rgba(255,255,255,.06);background:var(--bg);color:var(--sub);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.cat-btn .em{font-size:16px}
+.cat-btn.on{background:var(--accent);color:var(--accent-t);border-color:transparent}
+.pri-row{display:flex;gap:5px;margin-bottom:11px}
+.pri-btn{flex:1;padding:8px;border-radius:9px;border:1px solid rgba(255,255,255,.06);background:var(--bg);color:var(--sub);font-size:11px;cursor:pointer}
+.pri-btn.on.urgent{background:rgba(255,69,58,.2);color:var(--urgent);border-color:var(--urgent)}
+.pri-btn.on.normal{background:rgba(255,214,10,.2);color:var(--normal);border-color:var(--normal)}
+.pri-btn.on.someday{background:rgba(152,162,179,.2);color:var(--text);border-color:var(--someday)}
+.time-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.tq{padding:6px 11px;border-radius:9px;background:var(--bg);border:1px solid rgba(255,255,255,.06);color:var(--sub);font-size:11px;cursor:pointer}
+.tq.on{background:var(--accent);color:var(--accent-t);border-color:transparent}
+.dt-input{width:100%;background:var(--bg);border:none;border-radius:9px;padding:9px 11px;color:var(--text);font-size:13px;outline:none;margin-bottom:9px;color-scheme:dark}
+.due-row{display:flex;gap:5px;margin-bottom:9px;flex-wrap:wrap}
+.dq{padding:6px 11px;border-radius:9px;background:var(--bg);border:1px solid rgba(255,255,255,.06);color:var(--sub);font-size:11px;cursor:pointer}
+.dq.on{background:rgba(255,159,10,.2);color:var(--orange);border-color:var(--orange)}
+.btn-add{width:100%;padding:13px;background:var(--accent);color:var(--accent-t);border:none;border-radius:13px;font-size:15px;font-weight:600;cursor:pointer}
+.btn-add:active{opacity:.8}
 
-/* ── Toast ────────────────────────────────────────────────────── */
-.toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%) translateY(-80px); background: rgba(48,209,88,.92); color: #fff; padding: 9px 18px; border-radius: 18px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform .3s; max-width: 90vw; text-align: center; }
-.toast.show { transform: translateX(-50%) translateY(0); }
-.toast.error { background: rgba(255,69,58,.92); }
+/* Empty / loader */
+.empty{text-align:center;padding:50px 24px}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty p{color:var(--sub);font-size:15px}
+.spin{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading-wrap{display:flex;justify-content:center;padding:50px}
 
+/* Toast */
+.toast{position:fixed;top:10px;left:50%;transform:translateX(-50%) translateY(-80px);background:rgba(48,209,88,.92);color:#fff;padding:8px 16px;border-radius:16px;font-size:13px;font-weight:500;z-index:999;transition:transform .3s;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:rgba(255,69,58,.92)}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-top">
-    <div>
-      <div class="h-title" id="h-title">WEX MIND</div>
-      <div class="h-sub" id="h-sub">Загрузка…</div>
-    </div>
-    <div class="h-actions">
-      <button class="icon-btn" onclick="toggleSearch()" title="Поиск">🔍</button>
-      <button class="icon-btn" onclick="reload()" title="Обновить">↻</button>
-    </div>
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-l">
+    <h1>WEX MIND</h1>
+    <p id="hdr-sub">Загрузка…</p>
+  </div>
+  <div class="hdr-r">
+    <button class="icon-btn" onclick="toggleSearch()">🔍</button>
+    <button class="icon-btn" onclick="reload()">↻</button>
   </div>
 </div>
 
-<div class="search-wrap" id="search-wrap" style="display:none">
-  <input type="text" class="search-input" id="search" placeholder="Поиск по записям…" oninput="onSearch()">
+<!-- Search -->
+<div class="srch-wrap" id="srch-wrap">
+  <input class="srch" id="srch" placeholder="Поиск…" oninput="onSearch()">
 </div>
 
+<!-- Tabs -->
 <div class="tabs" id="tabs"></div>
 
-<div class="subfilter" id="subfilter" style="display:none">
-  <button class="chip active" data-pri="all" onclick="setPri('all',this)">Все</button>
-  <button class="chip" data-pri="urgent" onclick="setPri('urgent',this)">🔴 Срочно</button>
-  <button class="chip" data-pri="normal"  onclick="setPri('normal',this)">🟡 Обычно</button>
-  <button class="chip" data-pri="someday" onclick="setPri('someday',this)">⚪ Потом</button>
+<!-- Subfilter (priority) -->
+<div class="subf" id="subf" style="display:none">
+  <button class="chip on" onclick="setPri('all',this)">Все</button>
+  <button class="chip"    onclick="setPri('urgent',this)">🔴 Срочно</button>
+  <button class="chip"    onclick="setPri('normal',this)">🟡 Обычно</button>
+  <button class="chip"    onclick="setPri('someday',this)">⚪ Потом</button>
 </div>
 
-<div class="section" id="list"></div>
+<!-- Tag chips -->
+<div class="tag-chips" id="tag-chips"></div>
 
-<button class="fab" onclick="openSheet()">+</button>
+<!-- List -->
+<div class="list" id="list"></div>
+
+<!-- Quick-add bar -->
+<div class="qabar">
+  <button class="qa-expand-btn" onclick="openSheet()">⊕</button>
+  <input class="qa-input" id="qa-inp" placeholder="Быстро добавить задачу…" onkeydown="qaKey(event)">
+  <button class="qa-send" onclick="qaSend()">↑</button>
+</div>
 
 <div class="overlay" id="overlay" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet">
   <div class="handle"></div>
-  <h3 id="sheet-title">Добавить запись</h3>
+  <div class="sh-title">Добавить запись</div>
 
-  <div class="label">Тип</div>
+  <div class="lbl">Тип</div>
   <div class="cat-grid" id="cat-grid">
-    <button class="cat-btn on" data-cat="task"     onclick="selCat('task',this)"><span class="em">📋</span>Задача</button>
-    <button class="cat-btn"    data-cat="reminder" onclick="selCat('reminder',this)"><span class="em">⏰</span>Напом.</button>
-    <button class="cat-btn"    data-cat="idea"     onclick="selCat('idea',this)"><span class="em">💡</span>Идея</button>
-    <button class="cat-btn"    data-cat="thought"  onclick="selCat('thought',this)"><span class="em">💭</span>Мысль</button>
-    <button class="cat-btn"    data-cat="note"     onclick="selCat('note',this)"><span class="em">📝</span>Заметка</button>
+    <button class="cat-btn on" data-c="task"     onclick="selCat('task',this)"><span class="em">📋</span>Задача</button>
+    <button class="cat-btn"    data-c="reminder" onclick="selCat('reminder',this)"><span class="em">⏰</span>Напом.</button>
+    <button class="cat-btn"    data-c="idea"     onclick="selCat('idea',this)"><span class="em">💡</span>Идея</button>
+    <button class="cat-btn"    data-c="thought"  onclick="selCat('thought',this)"><span class="em">💭</span>Мысль</button>
+    <button class="cat-btn"    data-c="note"     onclick="selCat('note',this)"><span class="em">📝</span>Заметка</button>
+    <button class="cat-btn"    data-c="habit"    onclick="selCat('habit',this)"><span class="em">🔁</span>Привычка</button>
   </div>
 
-  <textarea class="field" id="inp-content" placeholder="Текст…"></textarea>
+  <textarea class="field" id="sh-content" placeholder="Текст…"></textarea>
 
-  <div class="label">Приоритет</div>
-  <div class="pri-row" id="pri-row">
-    <button class="pri-btn urgent" data-pri="urgent" onclick="selPri('urgent',this)">🔴 Срочно</button>
-    <button class="pri-btn normal on" data-pri="normal" onclick="selPri('normal',this)">🟡 Обычно</button>
-    <button class="pri-btn someday" data-pri="someday" onclick="selPri('someday',this)">⚪ Потом</button>
+  <div class="lbl">Приоритет</div>
+  <div class="pri-row">
+    <button class="pri-btn urgent"        onclick="selPri('urgent',this)">🔴 Срочно</button>
+    <button class="pri-btn normal on"     onclick="selPri('normal',this)">🟡 Обычно</button>
+    <button class="pri-btn someday"       onclick="selPri('someday',this)">⚪ Потом</button>
   </div>
 
-  <div id="reminder-block" style="display:none">
-    <div class="label">Когда напомнить</div>
-    <div class="time-row" id="time-row">
-      <button class="time-quick" data-min="60"   onclick="selTime(60,this)">+1ч</button>
-      <button class="time-quick" data-min="180"  onclick="selTime(180,this)">+3ч</button>
-      <button class="time-quick" data-min="today9"  onclick="selTime('today9',this)">Сегодня 9:00</button>
-      <button class="time-quick" data-min="tomorrow9" onclick="selTime('tomorrow9',this)">Завтра 9:00</button>
-      <button class="time-quick" data-min="custom" onclick="selTime('custom',this)">📅 Точно</button>
+  <div id="time-block" style="display:none">
+    <div class="lbl">Когда напомнить</div>
+    <div class="time-row">
+      <button class="tq" onclick="selTime(60,this)">+1ч</button>
+      <button class="tq" onclick="selTime(180,this)">+3ч</button>
+      <button class="tq" onclick="selTime('t9',this)">Сегодня 9:00</button>
+      <button class="tq" onclick="selTime('d9',this)">Завтра 9:00</button>
+      <button class="tq" onclick="selTime('custom',this)">📅 Точно</button>
     </div>
-    <input type="datetime-local" class="dt-input" id="inp-datetime" style="display:none">
+    <input type="datetime-local" class="dt-input" id="sh-dt" style="display:none">
   </div>
 
-  <button class="btn-add" id="btn-add" onclick="saveEntry()">Сохранить</button>
+  <div id="due-block" style="display:none">
+    <div class="lbl">Дедлайн (до когда)</div>
+    <div class="due-row">
+      <button class="dq" onclick="selDue('today',this)">Сегодня</button>
+      <button class="dq" onclick="selDue('tomorrow',this)">Завтра</button>
+      <button class="dq" onclick="selDue('week',this)">Через неделю</button>
+      <button class="dq" onclick="selDue('custom',this)">📅 Точно</button>
+    </div>
+    <input type="date" class="dt-input" id="sh-due" style="display:none">
+  </div>
+
+  <button class="btn-add" id="sh-save" onclick="saveEntry()">Сохранить</button>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const TOKEN = '__TOKEN__';
-const BASE  = '__BASE_URL__';
-const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor?.('secondary_bg_color'); }
+const TOKEN='__TOKEN__', BASE='__BASE_URL__';
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();tg.setHeaderColor?.('secondary_bg_color')}
 
-const CAT = {
-  task:     {emo:'📋', label:'Задачи'},
-  reminder: {emo:'⏰', label:'Напомин.'},
-  idea:     {emo:'💡', label:'Идеи'},
-  thought:  {emo:'💭', label:'Мысли'},
-  note:     {emo:'📝', label:'Заметки'},
+const CAT={
+  task:{e:'📋',l:'Задачи'},reminder:{e:'⏰',l:'Напомин.'},
+  idea:{e:'💡',l:'Идеи'},thought:{e:'💭',l:'Мысли'},
+  note:{e:'📝',l:'Заметки'},habit:{e:'🔁',l:'Привычки'},
 };
-
-const TABS = [
-  {key:'all',      label:'Все',          emo:'•'},
-  {key:'task',     label:'Задачи',       emo:'📋'},
-  {key:'reminder', label:'Напомин.',     emo:'⏰'},
-  {key:'idea',     label:'Идеи',         emo:'💡'},
-  {key:'note',     label:'Заметки',      emo:'📝'},
-  {key:'thought',  label:'Мысли',        emo:'💭'},
-  {key:'done',     label:'Готово',       emo:'✅'},
+const TABS=[
+  {k:'all',l:'Все',e:'•'},{k:'task',l:'Задачи',e:'📋'},
+  {k:'reminder',l:'Напомин.',e:'⏰'},{k:'idea',l:'Идеи',e:'💡'},
+  {k:'note',l:'Заметки',e:'📝'},{k:'thought',l:'Мысли',e:'💭'},
+  {k:'habit',l:'Привычки',e:'🔁'},{k:'done',l:'Готово',e:'✅'},
+  {k:'stats',l:'Стат.',e:'📊'},
 ];
+let entries=[],reminders=[],rByEntry={},stats=null;
+let tab='all',pri='all',search='',filterTag=null,expandedId=null;
+let shCat='task',shPri='normal',shTime=null,shDue=null;
 
-let entries = [];        // current list shown
-let reminders = [];      // pending reminders (entry_id -> reminder)
-let reminderByEntry = {};
-let stats = null;
-let tab = 'all';
-let pri = 'all';
-let search = '';
-let expandedId = null;
-let sheetCat = 'task';
-let sheetPri = 'normal';
-let sheetTime = null; // {kind, iso}
-
-// ── Tabs render ─────────────────────────────────────────────────
-function renderTabs() {
-  const el = document.getElementById('tabs');
-  el.innerHTML = TABS.map(t => {
-    const cnt = countForTab(t.key);
-    const numHtml = cnt > 0 ? `<span class="badge-num">${cnt}</span>` : '';
-    return `<button class="tab ${tab===t.key?'active':''}" onclick="setTab('${t.key}',this)">${t.emo} ${t.label}${numHtml}</button>`;
+// ── Tabs ──────────────────────────────────────────────────────────
+function renderTabs(){
+  document.getElementById('tabs').innerHTML=TABS.map(t=>{
+    const n=countTab(t.k);
+    return`<button class="tab ${tab===t.k?'active':''}" onclick="setTab('${t.k}',this)">${t.e} ${t.l}${n?`<span class="bn">${n}</span>`:''}</button>`;
   }).join('');
 }
-function countForTab(t) {
-  if (!stats) return 0;
-  if (t === 'all')  return stats.open_total || 0;
-  if (t === 'done') return stats.done_tasks || 0;
-  return stats.by_open[t] || 0;
+function countTab(k){
+  if(!stats)return 0;
+  if(k==='all')return stats.open_total||0;
+  if(k==='done')return stats.done_tasks||0;
+  if(k==='stats')return '';
+  return stats.by_open?.[k]||0;
 }
-
-// ── Setters ─────────────────────────────────────────────────────
-function setTab(t, el) {
-  tab = t; expandedId = null;
-  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+function setTab(t,el){
+  tab=t;expandedId=null;filterTag=null;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
-  document.getElementById('subfilter').style.display = (t === 'task' || t === 'all') ? 'flex' : 'none';
+  const showSub=t==='task'||t==='all';
+  document.getElementById('subf').style.display=showSub?'flex':'none';
+  if(t==='stats'){renderStats();return}
   load();
 }
-function setPri(p, el) {
-  pri = p;
-  document.querySelectorAll('.subfilter .chip').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
+function setPri(p,el){
+  pri=p;
+  document.querySelectorAll('#subf .chip').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
   render();
 }
-function toggleSearch() {
-  const w = document.getElementById('search-wrap');
-  if (w.style.display === 'none') {
-    w.style.display = 'block';
-    setTimeout(() => document.getElementById('search').focus(), 50);
-  } else {
-    w.style.display = 'none';
-    document.getElementById('search').value = '';
-    if (search) { search = ''; load(); }
+
+// ── Tag filter ────────────────────────────────────────────────────
+function buildTagChips(){
+  const allTags=new Set();
+  entries.forEach(e=>(e.tags||[]).forEach(t=>allTags.add(t)));
+  const tc=document.getElementById('tag-chips');
+  if(!allTags.size){tc.style.display='none';return}
+  tc.style.display='flex';
+  tc.innerHTML=[...allTags].slice(0,15).map(t=>
+    `<button class="tag-chip ${filterTag===t?'on':''}" onclick="setTagFilter('${esc(t)}')">#${esc(t)}</button>`
+  ).join('');
+}
+function setTagFilter(t){
+  filterTag=filterTag===t?null:t;
+  buildTagChips();render();
+}
+
+// ── Search ────────────────────────────────────────────────────────
+function toggleSearch(){
+  const w=document.getElementById('srch-wrap');
+  if(w.style.display==='none'||!w.style.display){
+    w.style.display='block';
+    setTimeout(()=>document.getElementById('srch').focus(),50);
+  }else{
+    w.style.display='none';
+    document.getElementById('srch').value='';
+    if(search){search='';load();}
   }
 }
-let searchTimer;
-function onSearch() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    search = document.getElementById('search').value.trim();
-    load();
-  }, 250);
-}
+let _st;
+function onSearch(){clearTimeout(_st);_st=setTimeout(()=>{search=document.getElementById('srch').value.trim();load();},280)}
 
-// ── Load ────────────────────────────────────────────────────────
-async function reload() {
-  tg?.HapticFeedback?.impactOccurred('light');
-  await load();
-}
+// ── Load ──────────────────────────────────────────────────────────
+async function reload(){tg?.HapticFeedback?.impactOccurred('light');await load();}
 
-async function load() {
-  document.getElementById('list').innerHTML = '<div class="loading-wrap"><div class="spinner"></div></div>';
-  try {
-    const status = tab === 'done' ? 'done' : 'open';
-    const cat    = (tab === 'all' || tab === 'done') ? '' : tab;
-    const q      = search || '';
-
-    const [entriesRes, remsRes, statsRes] = await Promise.all([
-      fetch(`${BASE}/api/entries?token=${TOKEN}&status=${status}${cat?`&category=${cat}`:''}${q?`&q=${encodeURIComponent(q)}`:''}`).then(r=>r.json()),
-      fetch(`${BASE}/api/reminders?token=${TOKEN}`).then(r=>r.json()),
-      fetch(`${BASE}/api/stats?token=${TOKEN}`).then(r=>r.json()),
+async function load(){
+  if(tab==='stats'){await loadStats();return}
+  document.getElementById('list').innerHTML='<div class="loading-wrap"><div class="spin"></div></div>';
+  try{
+    const status=tab==='done'?'done':'open';
+    const cat=(tab==='all'||tab==='done')?'':tab;
+    const q=search||'';
+    const [eRes,rRes,sRes]=await Promise.all([
+      api(`/api/entries?status=${status}${cat?`&category=${cat}`:''}${q?`&q=${enc(q)}`:''}`),
+      api('/api/reminders'),
+      api('/api/stats'),
     ]);
-    entries = Array.isArray(entriesRes) ? entriesRes : [];
-    reminders = Array.isArray(remsRes) ? remsRes : [];
-    reminderByEntry = {};
-    reminders.forEach(r => { reminderByEntry[r.entry_id] = r; });
+    entries=Array.isArray(eRes)?eRes:[];
+    reminders=Array.isArray(rRes)?rRes:[];
+    rByEntry={};
+    reminders.forEach(r=>{rByEntry[r.entry_id]=r});
 
-    // Build derived stats
-    if (statsRes && statsRes.by_category) {
-      // Need open-only counts per category — backend stats uses all rows; recompute open from current load is wrong
-      // Instead compute from a quick light fetch: just call /api/entries?status=open and group
-      const openRes = await fetch(`${BASE}/api/entries?token=${TOKEN}&status=open&limit=500`).then(r=>r.json()).catch(()=>[]);
-      const by_open = {};
-      let urgent_open = 0;
-      (openRes||[]).forEach(e => {
-        by_open[e.category] = (by_open[e.category]||0) + 1;
-        if (e.priority === 'urgent') urgent_open++;
-      });
-      stats = { ...statsRes, by_open, open_total: (openRes||[]).length, urgent_open };
-    } else {
-      stats = { by_open:{}, open_total:0, urgent_open:0, done_tasks:0 };
+    // Compute open counts per category
+    let openAll=entries;
+    if(tab==='done'||cat){
+      // need full open list for counts — fetch lightweight
+      const all=await api('/api/entries?status=open&limit=500').catch(()=>[]);
+      const by_open={},uo={};
+      (all||[]).forEach(e=>{by_open[e.category]=(by_open[e.category]||0)+1;if(e.priority==='urgent')uo[e.id]=1});
+      stats={...(sRes||{}),by_open,open_total:(all||[]).length,urgent_open:Object.keys(uo).length};
+    }else{
+      const by_open={};let urgent_open=0;
+      entries.forEach(e=>{by_open[e.category]=(by_open[e.category]||0)+1;if(e.priority==='urgent')urgent_open++});
+      stats={...(sRes||{}),by_open,open_total:entries.length,urgent_open};
     }
-
-    renderTabs();
-    renderHeader();
-    render();
-  } catch (e) {
-    console.error(e);
-    showToast('Ошибка загрузки', true);
-    document.getElementById('list').innerHTML = '';
-  }
+    renderTabs();renderHeader();buildTagChips();render();
+  }catch(e){console.error(e);showToast('Ошибка загрузки',1);document.getElementById('list').innerHTML='';}
 }
 
-function renderHeader() {
-  const sub = document.getElementById('h-sub');
-  if (!stats) { sub.textContent = '…'; return; }
-  const parts = [];
-  parts.push(`<b>${stats.open_total}</b> открыто`);
-  if (stats.urgent_open > 0) parts.push(`<span class="urgent">🔴 ${stats.urgent_open} срочных</span>`);
-  if (reminders.length > 0)  parts.push(`⏰ ${reminders.length} напомин.`);
-  sub.innerHTML = parts.join(' · ');
+function renderHeader(){
+  const s=document.getElementById('hdr-sub');
+  if(!stats){s.textContent='…';return}
+  const p=[];
+  p.push(`${stats.open_total||0} открыто`);
+  if(stats.urgent_open>0)p.push(`🔴 ${stats.urgent_open} срочных`);
+  if(reminders.length>0)p.push(`⏰ ${reminders.length}`);
+  s.textContent=p.join(' · ');
 }
 
-// ── Render list ─────────────────────────────────────────────────
-function fmtTime(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const tom = new Date(now); tom.setDate(tom.getDate()+1);
-  const isTom = d.toDateString() === tom.toDateString();
-  const hh = String(d.getHours()).padStart(2,'0');
-  const mm = String(d.getMinutes()).padStart(2,'0');
-  if (sameDay) return `${hh}:${mm}`;
-  if (isTom)   return `завтра ${hh}:${mm}`;
-  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${hh}:${mm}`;
+// ── Render list ───────────────────────────────────────────────────
+function fmtTime(iso){
+  if(!iso)return'';
+  const d=new Date(iso),now=new Date();
+  const same=d.toDateString()===now.toDateString();
+  const tom=new Date(now);tom.setDate(tom.getDate()+1);
+  const istom=d.toDateString()===tom.toDateString();
+  const hm=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if(same)return hm;
+  if(istom)return`завтра ${hm}`;
+  return`${pad(d.getDate())}.${pad(d.getMonth()+1)} ${hm}`;
 }
-function ageLabel(iso) {
-  if (!iso) return '';
-  const d = new Date(iso), now = new Date();
-  const days = Math.floor((now - d) / 86400000);
-  if (days <= 0) return 'сегодня';
-  if (days === 1) return 'вчера';
-  if (days < 7) return `${days}д`;
-  if (days < 30) return `${Math.floor(days/7)}нед`;
-  return `${Math.floor(days/30)}мес`;
+function fmtDue(iso){
+  if(!iso)return{txt:'',over:false};
+  const d=new Date(iso),now=new Date();
+  const diff=Math.floor((d-now)/86400000);
+  const over=diff<0;
+  if(over)return{txt:`просрочено`,over:true};
+  if(diff===0)return{txt:'сегодня',over:false};
+  if(diff===1)return{txt:'завтра',over:false};
+  return{txt:`${pad(d.getDate())}.${pad(d.getMonth()+1)}`,over:false};
+}
+function ageLabel(iso){
+  if(!iso)return'';
+  const d=new Date(iso),now=new Date();
+  const days=Math.floor((now-d)/86400000);
+  if(days<=0)return'сегодня';if(days===1)return'вчера';
+  if(days<7)return`${days}д`;if(days<30)return`${Math.floor(days/7)}нед`;
+  return`${Math.floor(days/30)}мес`;
+}
+function dayKey(iso){
+  if(!iso)return'давно';
+  const d=new Date(iso),now=new Date();
+  const diff=Math.floor((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
+  if(diff<-6)return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'short'});
+  if(diff<-1)return ageLabel(iso);
+  if(diff===-1)return'вчера';if(diff===0)return'сегодня';
+  if(diff===1)return'завтра';if(diff<7)return'на этой неделе';
+  return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'short'});
 }
 
-function dayKey(iso) {
-  if (!iso) return 'когда-то';
-  const d = new Date(iso), now = new Date();
-  const diff = Math.floor((d - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
-  if (diff < -1) return ageLabel(iso);
-  if (diff === -1) return 'вчера';
-  if (diff === 0)  return 'сегодня';
-  if (diff === 1)  return 'завтра';
-  if (diff < 7)    return 'на этой неделе';
-  return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'short'});
-}
+function render(){
+  const list=document.getElementById('list');
+  let items=entries.slice();
+  if(pri!=='all'&&(tab==='task'||tab==='all'))items=items.filter(e=>e.priority===pri);
+  if(filterTag)items=items.filter(e=>(e.tags||[]).includes(filterTag));
 
-function render() {
-  const list = document.getElementById('list');
-  let items = entries.slice();
-  if (pri !== 'all' && (tab === 'task' || tab === 'all')) {
-    items = items.filter(e => e.priority === pri);
-  }
-  if (!items.length) {
-    const emo = tab === 'done' ? '✅' : (search ? '🔍' : '✨');
-    const msg = search ? `Ничего не найдено по «${search}»` :
-                tab === 'done' ? 'Закрытых задач пока нет' :
-                tab === 'reminder' ? 'Нет напоминаний' :
-                'Пусто. Добавь первую запись';
-    list.innerHTML = `<div class="empty"><div class="empty-icon">${emo}</div><p>${msg}</p></div>`;
+  if(!items.length){
+    const emo=tab==='done'?'✅':search?'🔍':'✨';
+    const msg=search?`Ничего по «${search}»`:tab==='done'?'Ничего закрытого':tab==='reminder'?'Напоминаний нет':'Пусто — добавь запись';
+    list.innerHTML=`<div class="empty"><div class="empty-icon">${emo}</div><p>${msg}</p></div>`;
     return;
   }
 
-  // For reminder tab: sort by time
-  if (tab === 'reminder') {
-    items.sort((a, b) => {
-      const ra = reminderByEntry[a.id], rb = reminderByEntry[b.id];
-      const ta = ra?.remind_at || '9999';
-      const tb = rb?.remind_at || '9999';
-      return ta.localeCompare(tb);
-    });
+  if(tab==='reminder'){
+    items.sort((a,b)=>{const ra=rByEntry[a.id],rb=rByEntry[b.id];return(ra?.remind_at||'9999').localeCompare(rb?.remind_at||'9999');});
   }
 
-  // Group by day (created_at for non-reminders, remind_at for reminders)
-  const groups = {};
-  const order = [];
-  items.forEach(e => {
-    let key;
-    if (tab === 'reminder') {
-      const r = reminderByEntry[e.id];
-      key = r ? (r.recurrence ? '🔁 повторяющиеся' : dayKey(r.remind_at)) : 'когда-то';
-    } else {
-      key = dayKey(e.created_at);
-    }
-    if (!(key in groups)) { groups[key] = []; order.push(key); }
-    groups[key].push(e);
+  const groups={},order=[];
+  items.forEach(e=>{
+    let k;
+    if(tab==='reminder'){
+      const r=rByEntry[e.id];
+      k=r?(r.recurrence?'🔁 повторяющиеся':dayKey(r.remind_at)):'без времени';
+    }else k=dayKey(e.created_at);
+    if(!(k in groups)){groups[k]=[];order.push(k);}
+    groups[k].push(e);
   });
 
-  list.innerHTML = order.map(k => {
-    const cards = groups[k].map(renderCard).join('');
-    return `<div class="day-header">${k}</div>${cards}`;
-  }).join('');
+  list.innerHTML=order.map(k=>`<div class="day-h">${k}</div>${groups[k].map(renderCard).join('')}`).join('');
+  initSwipe();
 }
 
-function renderCard(e) {
-  const exp = expandedId === e.id;
-  const rem = reminderByEntry[e.id];
-  const cat = CAT[e.category] || {emo:'•', label:e.category};
-  const catBadge = `<span class="badge badge-cat-${e.category}">${cat.emo} ${e.category}</span>`;
+function renderCard(e){
+  const exp=expandedId===e.id;
+  const rem=rByEntry[e.id];
+  const cat=CAT[e.category]||{e:'•'};
+  const catB=`<span class="badge bc-${e.category}">${cat.e} ${e.category}</span>`;
 
-  let timeBadge = '';
-  if (rem) {
-    if (rem.recurrence) {
-      timeBadge = `<span class="badge badge-recur">🔁 ${rem.recurrence}</span>`;
-    } else if (rem.remind_at) {
-      timeBadge = `<span class="badge badge-time">⏰ ${fmtTime(rem.remind_at)}</span>`;
-    }
+  let timeB='',recurB='';
+  if(rem){
+    if(rem.recurrence)recurB=`<span class="badge br">🔁 ${esc(rem.recurrence)}</span>`;
+    else if(rem.remind_at)timeB=`<span class="badge bt">⏰ ${fmtTime(rem.remind_at)}</span>`;
   }
-  const ageBadge = `<span class="badge badge-age">${ageLabel(e.created_at)}</span>`;
 
-  const snoozeRow = rem ? `<div class="snooze-row">
-    <button class="snooze-btn" onclick="event.stopPropagation();snooze(${rem.id},10)">+10м</button>
-    <button class="snooze-btn" onclick="event.stopPropagation();snooze(${rem.id},60)">+1ч</button>
-    <button class="snooze-btn" onclick="event.stopPropagation();snooze(${rem.id},180)">+3ч</button>
-    <button class="snooze-btn" onclick="event.stopPropagation();cancelReminder(${rem.id})">🔇 Отмена</button>
-  </div>` : '';
+  let dueB='';
+  if(e.due_date){
+    const{txt,over}=fmtDue(e.due_date);
+    dueB=`<span class="badge ${over?'due-over':'due-ok'}">📅 ${txt}</span>`;
+  }
 
-  const expandPanel = exp ? `<div class="card-expand">
-    <textarea id="ed-${e.id}">${esc(e.content || e.title || '')}</textarea>
-    <div class="expand-row">
-      <button class="mini-chip ${e.priority==='urgent'?'on':''}"  onclick="event.stopPropagation();patchInline(${e.id},'priority','urgent',this)">🔴 Срочно</button>
-      <button class="mini-chip ${e.priority==='normal'?'on':''}"  onclick="event.stopPropagation();patchInline(${e.id},'priority','normal',this)">🟡 Обычно</button>
-      <button class="mini-chip ${e.priority==='someday'?'on':''}" onclick="event.stopPropagation();patchInline(${e.id},'priority','someday',this)">⚪ Потом</button>
-    </div>
-    <div class="expand-row">
-      ${['task','reminder','idea','thought','note'].map(c =>
-        `<button class="mini-chip ${e.category===c?'on':''}" onclick="event.stopPropagation();patchInline(${e.id},'category','${c}',this)">${CAT[c].emo}</button>`
-      ).join('')}
-    </div>
-    <div class="expand-actions">
-      <button class="btn-sm btn-secondary" onclick="event.stopPropagation();delTask(${e.id})">🗑️ Удалить</button>
-      <button class="btn-sm btn-primary"   onclick="event.stopPropagation();saveContent(${e.id})">💾 Сохранить</button>
-    </div>
-  </div>` : '';
+  const ageB=`<span class="badge ba">${ageLabel(e.created_at)}</span>`;
+  const tagBs=(e.tags||[]).slice(0,3).map(t=>`<span class="badge btag" onclick="event.stopPropagation();setTagFilter('${esc(t)}')">#${esc(t)}</span>`).join('');
 
-  return `<div class="card ${exp?'expanded':''}" id="c${e.id}">
-    <div class="dot ${e.priority}"></div>
-    <div class="card-body" onclick="toggleExpand(${e.id})">
-      <div class="card-title">${esc(e.title || e.content || '')}</div>
-      <div class="card-meta">${catBadge}${timeBadge}${ageBadge}</div>
-      ${snoozeRow}
-      ${expandPanel}
+  const snoozeRow=rem?`<div class="snooze-row">
+    <button class="snbtn" onclick="event.stopPropagation();snooze(${rem.id},10)">+10м</button>
+    <button class="snbtn" onclick="event.stopPropagation();snooze(${rem.id},60)">+1ч</button>
+    <button class="snbtn" onclick="event.stopPropagation();snooze(${rem.id},180)">+3ч</button>
+    <button class="snbtn" onclick="event.stopPropagation();cancelRem(${rem.id})">🔇</button>
+  </div>`:'';
+
+  const expandHtml=exp?`<div class="cexpand">
+    <textarea id="ed-${e.id}">${esc(e.content||e.title||'')}</textarea>
+    <div class="mchips">
+      ${['urgent','normal','someday'].map(p=>`<button class="mc ${e.priority===p?'on':''}" onclick="event.stopPropagation();patchInline(${e.id},'priority','${p}',this)">${p==='urgent'?'🔴 Срочно':p==='normal'?'🟡 Обычно':'⚪ Потом'}</button>`).join('')}
     </div>
-    <div class="card-actions">
-      <button class="btn-icon btn-check" onclick="event.stopPropagation();closeTask(${e.id})">✓</button>
-      <button class="btn-icon btn-edit"  onclick="event.stopPropagation();toggleExpand(${e.id})">✎</button>
+    <div class="mchips">
+      ${Object.keys(CAT).map(c=>`<button class="mc ${e.category===c?'on':''}" onclick="event.stopPropagation();patchInline(${e.id},'category','${c}',this)">${CAT[c].e}</button>`).join('')}
     </div>
+    <div class="exp-actions">
+      <button class="btn-sm btn-s" onclick="event.stopPropagation();delTask(${e.id})">🗑️</button>
+      <button class="btn-sm btn-p" onclick="event.stopPropagation();saveContent(${e.id})">💾 Сохранить</button>
+    </div>
+  </div>`:'';
+
+  return`<div class="card ${exp?'expanded':''}" id="c${e.id}" data-id="${e.id}">
+    <div class="swipe-left-bg">✓ Готово</div>
+    <div class="swipe-right-bg">🗑️</div>
+    <div class="card-inner">
+      <div class="dot ${e.priority}"></div>
+      <div class="cbody" onclick="toggleExp(${e.id})">
+        <div class="ctitle">${esc(e.title||e.content||'(без текста)')}</div>
+        <div class="cmeta">${catB}${timeB}${recurB}${dueB}${ageB}${tagBs}</div>
+        ${snoozeRow}
+      </div>
+      <div class="cactions">
+        <button class="btn-i bi-check" onclick="event.stopPropagation();closeTask(${e.id})">✓</button>
+        <button class="btn-i bi-edit"  onclick="event.stopPropagation();toggleExp(${e.id})">✎</button>
+      </div>
+    </div>
+    ${expandHtml}
   </div>`;
 }
 
-function toggleExpand(id) {
-  expandedId = (expandedId === id) ? null : id;
+function toggleExp(id){
+  expandedId=expandedId===id?null:id;
   render();
+  if(expandedId===id)setTimeout(()=>document.getElementById('ed-'+id)?.focus(),100);
 }
 
-// ── Actions ─────────────────────────────────────────────────────
-async function closeTask(id) {
-  animateOut(id);
-  await fetch(`${BASE}/api/close/${id}?token=${TOKEN}`, {method:'POST'});
-  setTimeout(load, 220);
-  showToast('✅ Закрыто');
+// ── Swipe ─────────────────────────────────────────────────────────
+function initSwipe(){
+  document.querySelectorAll('.card').forEach(card=>{
+    let sx=0,sy=0,dx=0,swiping=false;
+    card.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=0;swiping=false;},{passive:true});
+    card.addEventListener('touchmove',e=>{
+      dx=e.touches[0].clientX-sx;
+      const dy=Math.abs(e.touches[0].clientY-sy);
+      if(Math.abs(dx)>12&&Math.abs(dx)>dy){swiping=true;}
+      if(!swiping)return;
+      const inner=card.querySelector('.card-inner');
+      if(!inner)return;
+      inner.style.transform=`translateX(${dx}px)`;
+      inner.style.transition='none';
+      const lbg=card.querySelector('.swipe-left-bg'),rbg=card.querySelector('.swipe-right-bg');
+      if(lbg)lbg.style.opacity=Math.max(0,Math.min(1,(dx-40)/60));
+      if(rbg)rbg.style.opacity=Math.max(0,Math.min(1,(-dx-40)/60));
+    },{passive:true});
+    card.addEventListener('touchend',async()=>{
+      const inner=card.querySelector('.card-inner');
+      if(!inner)return;
+      inner.style.transition='transform .2s';
+      inner.style.transform='';
+      const lbg=card.querySelector('.swipe-left-bg'),rbg=card.querySelector('.swipe-right-bg');
+      if(lbg)lbg.style.opacity=0;if(rbg)rbg.style.opacity=0;
+      const id=parseInt(card.dataset.id);
+      if(dx>80)closeTask(id);
+      else if(dx<-80)delTask(id,true);
+    });
+  });
+}
+
+// ── Actions ───────────────────────────────────────────────────────
+async function closeTask(id){
+  animOut(id);
+  await api(`/api/close/${id}`,'POST');
+  setTimeout(load,220);showToast('✅ Закрыто');
   tg?.HapticFeedback?.notificationOccurred('success');
 }
-async function delTask(id) {
-  if (!confirm('Удалить запись?')) return;
-  animateOut(id);
-  await fetch(`${BASE}/api/delete/${id}?token=${TOKEN}`, {method:'POST'});
-  setTimeout(load, 220);
-  showToast('🗑️ Удалено');
+async function delTask(id,noConfirm=false){
+  if(!noConfirm&&!confirm('Удалить запись?'))return;
+  animOut(id);
+  await api(`/api/delete/${id}`,'POST');
+  setTimeout(load,220);showToast('🗑️ Удалено');
 }
-async function patchInline(id, field, value, el) {
-  el.parentElement.querySelectorAll('.mini-chip').forEach(b => b.classList.remove('on'));
+async function patchInline(id,f,v,el){
+  el.parentElement.querySelectorAll('.mc').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
-  await fetch(`${BASE}/api/edit/${id}?token=${TOKEN}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({[field]: value}),
-  });
-  // optimistic — no reload to keep edit panel open
-  const e = entries.find(x => x.id === id);
-  if (e) e[field] = value;
+  await api(`/api/edit/${id}`,'POST',{[f]:v});
+  const e=entries.find(x=>x.id===id);if(e)e[f]=v;
 }
-async function saveContent(id) {
-  const txt = document.getElementById('ed-'+id)?.value?.trim();
-  if (!txt) return;
-  await fetch(`${BASE}/api/edit/${id}?token=${TOKEN}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({content: txt, title: txt.slice(0,80)}),
-  });
-  showToast('💾 Сохранено');
-  expandedId = null;
-  load();
+async function saveContent(id){
+  const txt=document.getElementById('ed-'+id)?.value?.trim();
+  if(!txt)return;
+  await api(`/api/edit/${id}`,'POST',{content:txt,title:txt.slice(0,80)});
+  showToast('💾 Сохранено');expandedId=null;load();
 }
-async function snooze(remId, mins) {
-  const r = await fetch(`${BASE}/api/reminder/snooze/${remId}?token=${TOKEN}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({minutes: mins}),
-  }).then(r=>r.json()).catch(()=>null);
-  if (r?.ok) { showToast(`😴 +${mins}м`); tg?.HapticFeedback?.impactOccurred('light'); load(); }
-  else showToast('Не удалось', true);
+async function snooze(remId,mins){
+  const r=await api(`/api/reminder/snooze/${remId}`,'POST',{minutes:mins});
+  if(r?.ok){showToast(`😴 +${mins}м`);tg?.HapticFeedback?.impactOccurred('light');load();}
+  else showToast('Не удалось',1);
 }
-async function cancelReminder(remId) {
-  if (!confirm('Отменить напоминание?')) return;
-  await fetch(`${BASE}/api/reminder/cancel/${remId}?token=${TOKEN}`, {method:'POST'});
-  showToast('🔇 Отменено');
-  load();
+async function cancelRem(remId){
+  if(!confirm('Отменить напоминание?'))return;
+  await api(`/api/reminder/cancel/${remId}`,'POST');
+  showToast('🔇 Отменено');load();
 }
-function animateOut(id) {
-  document.getElementById('c'+id)?.classList.add('removing');
+function animOut(id){document.getElementById('c'+id)?.classList.add('removing');}
+
+// ── Quick-add bar ─────────────────────────────────────────────────
+function qaKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();qaSend();}}
+async function qaSend(){
+  const txt=document.getElementById('qa-inp').value.trim();
+  if(!txt)return;
+  const r=await api('/api/add','POST',{content:txt,category:'task',priority:'normal'});
+  if(r?.ok){document.getElementById('qa-inp').value='';showToast('📋 Добавлено');tg?.HapticFeedback?.notificationOccurred('success');load();}
+  else showToast('Ошибка',1);
 }
 
-// ── Sheet ───────────────────────────────────────────────────────
-function openSheet() {
+// ── Stats tab ─────────────────────────────────────────────────────
+async function loadStats(){
+  document.getElementById('list').innerHTML='<div class="loading-wrap"><div class="spin"></div></div>';
+  try{
+    const[s,habits]=await Promise.all([api('/api/stats'),api('/api/entries?category=habit&status=open')]);
+    if(tab==='stats'){renderStatsView(s,Array.isArray(habits)?habits:[]);}
+  }catch(e){showToast('Ошибка',1);}
+}
+function renderStats(){loadStats();}
+
+function renderStatsView(s,habits){
+  const cat_icons={task:'📋',thought:'💭',idea:'💡',reminder:'⏰',note:'📝',habit:'🔁'};
+  const total=s?.total||0,open=s?.open_tasks||0,done=s?.done_tasks||0;
+  const rate=total>0?Math.round(done/total*100):0;
+  const byC=s?.by_category||{};
+  const maxC=Math.max(1,...Object.values(byC));
+  const barColors={task:'#4c9bf7',reminder:'#ff9f0a',idea:'#bf5af2',thought:'#98a2b3',note:'#30d158',habit:'#bf5af2'};
+  const barsHtml=Object.entries(byC).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,n])=>
+    `<div class="sbar">
+      <div class="sbar-lbl">${cat_icons[c]||'•'} ${c}</div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:${Math.round(n/maxC*100)}%;background:${barColors[c]||'#4c9bf7'}"></div></div>
+      <div class="sbar-num">${n}</div>
+    </div>`
+  ).join('');
+
+  const habitsHtml=habits.length?`<div class="habits-wrap">
+    <div class="stat-bar-title">🔁 Привычки</div>
+    ${habits.map(h=>`<div class="habit-row">
+      <div class="habit-name">${esc(h.title||h.content||'')}</div>
+      <button class="habit-btn" onclick="markHabit(${h.id})">✅ Отметить</button>
+    </div>`).join('')}
+  </div>`:'';
+
+  document.getElementById('list').innerHTML=`<div class="stats-wrap">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" style="color:var(--link)">${total}</div><div class="stat-lbl">всего записей</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--orange)">${open}</div><div class="stat-lbl">открытых задач</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--green)">${done}</div><div class="stat-lbl">закрыто задач</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--purple)">${rate}%</div><div class="stat-lbl">выполнено</div></div>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar-title">По категориям</div>
+      ${barsHtml}
+    </div>
+    ${habitsHtml}
+  </div>`;
+}
+
+async function markHabit(id){
+  await api(`/api/close/${id}`,'POST');
+  await api(`/api/edit/${id}`,'POST',{status:'open'});
+  showToast('✅ Привычка отмечена!');tg?.HapticFeedback?.notificationOccurred('success');
+  loadStats();
+}
+
+// ── Sheet ─────────────────────────────────────────────────────────
+function openSheet(){
   document.getElementById('sheet').classList.add('show');
   document.getElementById('overlay').classList.add('show');
-  setTimeout(() => document.getElementById('inp-content').focus(), 350);
+  // Pre-fill from quick-add if has text
+  const qa=document.getElementById('qa-inp').value.trim();
+  if(qa){document.getElementById('sh-content').value=qa;document.getElementById('qa-inp').value='';}
+  setTimeout(()=>document.getElementById('sh-content').focus(),350);
   tg?.HapticFeedback?.impactOccurred('light');
 }
-function closeSheet() {
+function closeSheet(){
   document.getElementById('sheet').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
 }
-function selCat(c, el) {
-  sheetCat = c;
-  document.querySelectorAll('#cat-grid .cat-btn').forEach(b => b.classList.remove('on'));
+function selCat(c,el){
+  shCat=c;
+  document.querySelectorAll('#cat-grid .cat-btn').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
-  document.getElementById('reminder-block').style.display = c === 'reminder' ? 'block' : 'none';
+  document.getElementById('time-block').style.display=(c==='reminder'||c==='habit')?'block':'none';
+  document.getElementById('due-block').style.display=(c==='task')?'block':'none';
 }
-function selPri(p, el) {
-  sheetPri = p;
-  document.querySelectorAll('#pri-row .pri-btn').forEach(b => b.classList.remove('on'));
+function selPri(p,el){
+  shPri=p;
+  document.querySelectorAll('.pri-btn').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
 }
-function selTime(kind, el) {
-  document.querySelectorAll('#time-row .time-quick').forEach(b => b.classList.remove('on'));
-  el.classList.add('on');
-  const dt = document.getElementById('inp-datetime');
-  const now = new Date();
-  let target;
-  if (kind === 'custom') {
-    dt.style.display = 'block';
-    if (!dt.value) {
-      const t = new Date(Date.now() + 60*60*1000);
-      dt.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}T${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-    }
-    sheetTime = {kind:'custom'};
-    return;
-  }
-  dt.style.display = 'none';
-  if (typeof kind === 'number') {
-    target = new Date(Date.now() + kind*60*1000);
-  } else if (kind === 'today9') {
-    target = new Date(); target.setHours(9,0,0,0);
-    if (target < now) target.setDate(target.getDate()+1);
-  } else if (kind === 'tomorrow9') {
-    target = new Date(); target.setDate(target.getDate()+1); target.setHours(9,0,0,0);
-  }
-  sheetTime = {kind, iso: target.toISOString()};
+function selTime(k,el){
+  document.querySelectorAll('.tq').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  const dt=document.getElementById('sh-dt');const now=new Date();let t;
+  if(k==='custom'){dt.style.display='block';shTime={kind:'custom'};return;}
+  dt.style.display='none';
+  if(typeof k==='number')t=new Date(Date.now()+k*60000);
+  else if(k==='t9'){t=new Date();t.setHours(9,0,0,0);if(t<now)t.setDate(t.getDate()+1);}
+  else if(k==='d9'){t=new Date();t.setDate(t.getDate()+1);t.setHours(9,0,0,0);}
+  shTime={kind:k,iso:t.toISOString()};
+}
+function selDue(k,el){
+  document.querySelectorAll('.dq').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  const di=document.getElementById('sh-due');const now=new Date();let d;
+  if(k==='custom'){di.style.display='block';shDue={kind:'custom'};return;}
+  di.style.display='none';
+  if(k==='today')d=new Date();
+  else if(k==='tomorrow'){d=new Date();d.setDate(d.getDate()+1);}
+  else if(k==='week'){d=new Date();d.setDate(d.getDate()+7);}
+  shDue={kind:k,iso:d.toISOString()};
 }
 
-async function saveEntry() {
-  const content = document.getElementById('inp-content').value.trim();
-  if (!content) { document.getElementById('inp-content').focus(); return; }
-  const btn = document.getElementById('btn-add');
-  btn.textContent = '…'; btn.disabled = true;
-
-  const body = { content, priority: sheetPri, category: sheetCat };
-  if (sheetCat === 'reminder' && sheetTime) {
-    if (sheetTime.kind === 'custom') {
-      const v = document.getElementById('inp-datetime').value;
-      if (v) body.remind_at = new Date(v).toISOString();
-    } else if (sheetTime.iso) {
-      body.remind_at = sheetTime.iso;
-    }
+async function saveEntry(){
+  const content=document.getElementById('sh-content').value.trim();
+  if(!content){document.getElementById('sh-content').focus();return;}
+  const btn=document.getElementById('sh-save');btn.textContent='…';btn.disabled=true;
+  const body={content,priority:shPri,category:shCat};
+  if((shCat==='reminder'||shCat==='habit')&&shTime){
+    if(shTime.kind==='custom'){const v=document.getElementById('sh-dt').value;if(v)body.remind_at=new Date(v).toISOString();}
+    else if(shTime.iso)body.remind_at=shTime.iso;
   }
-
-  try {
-    const r = await fetch(`${BASE}/api/add?token=${TOKEN}`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body),
-    }).then(r=>r.json());
-    if (r.ok) {
-      document.getElementById('inp-content').value = '';
-      sheetTime = null;
-      document.querySelectorAll('#time-row .time-quick').forEach(b => b.classList.remove('on'));
-      closeSheet();
-      showToast(`${CAT[sheetCat].emo} Добавлено`);
-      load();
-    } else {
-      showToast('Ошибка', true);
-    }
-  } catch {
-    showToast('Сеть недоступна', true);
-  } finally { btn.textContent = 'Сохранить'; btn.disabled = false; }
+  if(shCat==='task'&&shDue){
+    if(shDue.kind==='custom'){const v=document.getElementById('sh-due').value;if(v)body.due_date=new Date(v).toISOString();}
+    else if(shDue.iso)body.due_date=shDue.iso;
+  }
+  try{
+    const r=await api('/api/add','POST',body);
+    if(r?.ok){document.getElementById('sh-content').value='';shTime=null;shDue=null;closeSheet();showToast(`${CAT[shCat].e} Добавлено`);load();}
+    else showToast('Ошибка',1);
+  }finally{btn.textContent='Сохранить';btn.disabled=false;}
 }
 
-// ── Util ────────────────────────────────────────────────────────
-function showToast(msg, err=false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (err?' error':'');
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+// ── Utils ─────────────────────────────────────────────────────────
+async function api(path,method='GET',body){
+  const sep=path.includes('?')?'&':'?';
+  const r=await fetch(`${BASE}${path}${sep}token=${TOKEN}`,{
+    method,headers:body?{'Content-Type':'application/json'}:{},
+    body:body?JSON.stringify(body):undefined,
+  });
+  return r.ok?r.json().catch(()=>null):null;
 }
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(msg,err=0){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast'+(err?' err':'');
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);
+}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function enc(s){return encodeURIComponent(s);}
+function pad(n){return String(n).padStart(2,'0');}
 
-// ── Init ────────────────────────────────────────────────────────
-renderTabs();
-load();
+// ── Init ──────────────────────────────────────────────────────────
+renderTabs();load();
 </script>
 </body>
 </html>

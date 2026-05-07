@@ -69,10 +69,16 @@ async def check_connection() -> None:
         ) from e
 
 
+def _parse_dt(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
 def _to_entry(row: dict) -> Entry:
     return Entry(
         id=row["id"],
-        created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
+        created_at=_parse_dt(row["created_at"]),
         content=row["content"],
         title=row.get("title"),
         category=Category(row["category"]),
@@ -81,6 +87,7 @@ def _to_entry(row: dict) -> Entry:
         tags=row.get("tags") or [],
         source=row.get("source") or "telegram",
         raw_kind=RawKind(row.get("raw_kind") or "text"),
+        due_date=_parse_dt(row.get("due_date")),
     )
 
 
@@ -97,19 +104,97 @@ def _to_reminder(row: dict) -> Reminder:
 
 
 async def insert_entry(entry: Entry) -> Entry:
+    payload: dict = {
+        "content": entry.content,
+        "title": entry.title,
+        "category": entry.category.value,
+        "priority": entry.priority.value,
+        "status": entry.status.value,
+        "tags": entry.tags,
+        "source": entry.source,
+        "raw_kind": entry.raw_kind.value,
+    }
+    if entry.due_date:
+        payload["due_date"] = entry.due_date.isoformat()
     async with _client() as c:
-        r = await c.post("/entries", json={
-            "content": entry.content,
-            "title": entry.title,
-            "category": entry.category.value,
-            "priority": entry.priority.value,
-            "status": entry.status.value,
-            "tags": entry.tags,
-            "source": entry.source,
-            "raw_kind": entry.raw_kind.value,
-        })
+        r = await c.post("/entries", json=payload)
         r.raise_for_status()
         return _to_entry(r.json()[0])
+
+
+async def append_to_entry(entry_id: int, extra_text: str) -> Optional[Entry]:
+    """Append extra_text to existing entry's content (used for reply-to-entry)."""
+    async with _client() as c:
+        # First fetch current content
+        r = await c.get("/entries", params={"id": f"eq.{entry_id}", "select": "id,content"})
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            return None
+        old = rows[0]["content"] or ""
+        new_content = f"{old}\n\n— {extra_text}"
+        return await update_entry(entry_id, {"content": new_content})
+
+
+async def find_duplicate(title: str, content: str) -> Optional[Entry]:
+    """Look for a very similar entry saved in last hour (dedup guard)."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    # Use title match first (exact), then content prefix
+    q = title[:60] if title else content[:60]
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "or": f"(title.ilike.*{q[:40]}*,content.ilike.*{q[:40]}*)",
+            "created_at": f"gte.{cutoff}",
+            "order": "created_at.desc",
+            "limit": 5,
+        })
+        r.raise_for_status()
+        rows = r.json()
+        return _to_entry(rows[0]) if rows else None
+
+
+async def get_habits() -> list[Entry]:
+    async with _client() as c:
+        r = await c.get("/entries", params={
+            "category": "eq.habit",
+            "status": "eq.open",
+            "order": "created_at.desc",
+        })
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
+
+
+async def get_habit_streak(entry_id: int) -> int:
+    """Count how many consecutive days (backwards from today) a habit was marked done.
+    Relies on 'done' entries with reply_to_entry_id matching this habit.
+    Fallback: just return 0 if column doesn't exist yet."""
+    try:
+        async with _client() as c:
+            r = await c.get("/entries", params={
+                "reply_to_entry_id": f"eq.{entry_id}",
+                "status": "eq.done",
+                "order": "created_at.desc",
+                "limit": 60,
+                "select": "created_at",
+            })
+            r.raise_for_status()
+            rows = r.json()
+        if not rows:
+            return 0
+        dates = set()
+        for row in rows:
+            dt = _parse_dt(row["created_at"])
+            if dt:
+                dates.add(dt.date())
+        streak = 0
+        from datetime import date, timedelta as td
+        d = date.today()
+        while d in dates:
+            streak += 1
+            d -= td(days=1)
+        return streak
+    except Exception:
+        return 0
 
 
 async def get_recent(limit: int = 20) -> list[Entry]:

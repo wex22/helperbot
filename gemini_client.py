@@ -20,11 +20,12 @@ _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
 {
   "is_conversational": true | false,
   "reply": "<friendly reply in user's language if is_conversational=true, else omit>",
-  "category": "task" | "thought" | "idea" | "reminder" | "note",
+  "category": "task" | "thought" | "idea" | "reminder" | "note" | "habit",
   "priority": "urgent" | "normal" | "someday",
   "title": "<short title ≤80 chars>",
   "tags": ["tag1", "tag2"],
   "transcript": "<if voice/photo: recognized text or image description, else omit>",
+  "due_date": "<ISO 8601 with tz, only when user sets a deadline like 'до пятницы / by Friday / до 15 мая'>",
   "remind_at": "<ISO 8601 with tz offset, only for single one-shot reminder, else omit>",
   "recurrence": "<cron 'min hour day month dow', only for single recurring, else omit>",
   "reminders": [
@@ -34,7 +35,14 @@ _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
   "close_task_id": <int or omit>,
   "is_postpone": true | false,
   "postpone_id": <int or omit>,
-  "postpone_to": "<ISO 8601 with tz offset, or omit>"
+  "postpone_to": "<ISO 8601 with tz offset, or omit>",
+  "multi_entries": [
+    {"title":"<title>","content":"<full text>","category":"task|idea|reminder|note","priority":"urgent|normal|someday","due_date":"<ISO or omit>"}
+  ],
+  "is_habit_done": true | false,
+  "is_reply_append": true | false,
+  "reply_entry_id": <int or omit>,
+  "append_text": "<text to append to existing entry, or omit>"
 }
 
 MULTIPLE REMINDERS — use "reminders" array (not top-level fields) when user asks for several at once.
@@ -66,10 +74,30 @@ POSTPONE / EDIT REMINDER (is_postpone=true):
 
 DONE-FOR-RECURRING (is_recurring_done=true):
   When user says "принял витамины", "сделал утренние дела", "сделал то напоминание" right after a recurring reminder fires —
-  return is_close_task_command=true with close_task_id set to the matching reminder's id IF clear from context."""
+  return is_close_task_command=true with close_task_id set to the matching reminder's id IF clear from context.
+
+DUE DATE:
+  When user mentions a deadline ("до пятницы", "успеть до 20 мая", "by next Monday", "нужно до 15:00"):
+  Set "due_date" to ISO 8601. Example: "сдать отчёт до пятницы" → category=task, due_date=<next friday ISO>.
+
+MULTI-ENTRY BATCH (multi_entries array):
+  When a voice/text message contains MULTIPLE distinct items to save (e.g. "запиши: купить хлеб, позвонить маме, и идея — сделать приложение"):
+  Return "multi_entries" array with each item. Set is_conversational=false. Set category/title/priority per item.
+  Only use multi_entries when there are clearly 2+ distinct items. Single items → normal single save.
+
+HABIT TRACKING (category=habit):
+  When user says "каждый день отмечать X", "трекай X", "следи за X каждый день" → category=habit, set recurrence.
+  When user says "выпил воду", "сделал зарядку", "принял таблетки" matching a known habit → is_habit_done=true.
+  (The habit title is matched against recent entries in context.)
+
+REPLY / APPEND TO ENTRY (is_reply_append=true):
+  When user is adding context to an existing entry (reply_entry_id will be provided separately by system),
+  or says explicitly "добавь к задаче N: ...", "дополни запись 42 — ..." →
+  Return: {"is_reply_append": true, "reply_entry_id": <id>, "append_text": "<new text>"}
+  Do NOT create a new entry."""
 
 
-def _system_prompt(history: list[Entry], chat_buffer: list[dict]) -> str:
+def _system_prompt(history: list[Entry], chat_buffer: list[dict], reply_entry_id: Optional[int] = None) -> str:
     now = datetime.now().astimezone().isoformat()
     history_block = "\n".join(
         f"- [{e.created_at:%Y-%m-%d %H:%M}] ({e.category.value}/{e.priority.value}/{e.status.value}) "
@@ -84,11 +112,15 @@ def _system_prompt(history: list[Entry], chat_buffer: list[dict]) -> str:
             for m in chat_buffer
         )
 
+    reply_hint = ""
+    if reply_entry_id:
+        reply_hint = f"\nSYSTEM: User is replying to entry #{reply_entry_id}. If they are adding context/notes, set is_reply_append=true, reply_entry_id={reply_entry_id}, append_text=<their text>.\n"
+
     return f"""You are a smart personal assistant. You process messages and return strict JSON.
 
 Current local datetime: {now}
 User timezone: {settings.TZ}
-{buffer_block}
+{buffer_block}{reply_hint}
 Recent saved entries (newest first):
 {history_block}
 
@@ -116,6 +148,7 @@ Use recent conversation context to understand what the user means.
 Do NOT show full capability list unless user explicitly asks "что умеешь" / "what can you do".
 
 - Russian "напомни/напомнить" = reminder. "надо/нужно/сделать" = task. "идея/мысль" = idea/thought.
+- "трекай/следи/каждый день отмечать/привычка" = habit. Habits always have recurrence.
 - Urgency: "срочно/asap" => urgent. "когда-нибудь" => someday. Otherwise normal.
 - Resolve relative time ("через 10 минут", "tomorrow at 9") against current datetime for remind_at.
 - is_close_task_command=true when: "сделал", "done", "готово", "выполнено".
@@ -146,8 +179,9 @@ async def classify(
     chat_buffer: Optional[list[dict]] = None,
     audio_bytes: Optional[bytes] = None,
     image_bytes: Optional[bytes] = None,
+    reply_entry_id: Optional[int] = None,
 ) -> ClassificationResult:
-    system = _system_prompt(history, chat_buffer or [])
+    system = _system_prompt(history, chat_buffer or [], reply_entry_id=reply_entry_id)
 
     if audio_bytes:
         transcript = await _transcribe(audio_bytes)

@@ -10,6 +10,7 @@ class Category(str, Enum):
     IDEA = "idea"
     REMINDER = "reminder"
     NOTE = "note"
+    HABIT = "habit"
 
 
 class Priority(str, Enum):
@@ -52,6 +53,21 @@ class ClassificationResult(BaseModel):
     is_postpone: bool = False
     postpone_id: Optional[int] = None
     postpone_to: Optional[str] = None
+    due_date: Optional[str] = None           # ISO 8601 deadline parsed from message
+    multi_entries: list[dict] = Field(default_factory=list)   # batch from voice (validated later)
+    is_habit_done: bool = False              # "выпил воду" → mark habit done today
+    is_reply_append: bool = False            # user replying to add context to existing entry
+    reply_entry_id: Optional[int] = None    # which entry to append to
+    append_text: Optional[str] = None       # text to append
+
+
+class MultiEntry(BaseModel):
+    """One item in a batch save (multi-task voice message)."""
+    title: str = ""
+    content: str = ""
+    category: str = "task"
+    priority: str = "normal"
+    due_date: Optional[str] = None
 
 
 class Entry(BaseModel):
@@ -65,6 +81,8 @@ class Entry(BaseModel):
     tags: list[str] = Field(default_factory=list)
     source: str = "telegram"
     raw_kind: RawKind = RawKind.TEXT
+    due_date: Optional[datetime] = None
+    reply_to_entry_id: Optional[int] = None  # if this is a comment on another entry
 
 
 class Reminder(BaseModel):

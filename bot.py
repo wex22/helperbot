@@ -73,13 +73,14 @@ async def api_tasks(request: web.Request) -> web.Response:
 def _entry_dict(e: Entry) -> dict:
     return {
         "id": e.id,
-        "title": e.title or (e.content[:80] if e.content else ""),
+        "title": e.title or (e.content[:80] if e.content else "(без текста)"),
         "content": e.content,
         "category": e.category.value,
         "priority": e.priority.value,
         "status": e.status.value,
         "tags": e.tags,
         "created_at": e.created_at.isoformat() if e.created_at else None,
+        "due_date": e.due_date.isoformat() if e.due_date else None,
     }
 
 

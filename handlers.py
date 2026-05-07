@@ -32,6 +32,12 @@ TAG_RE = re.compile(r"#([\wа-яА-ЯёЁ\-]+)", re.UNICODE)
 DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|выполнено|done)\b\s*(.*)?", re.IGNORECASE)
 URL_RE  = re.compile(r"^https?://\S+$", re.IGNORECASE)
 
+# Mapping bot message_id → entry_id (to support reply-to-entry)
+_bot_msg_to_entry: dict[int, int] = {}
+
+# Project context: if set, all new entries get this tag
+_active_project: Optional[str] = None
+
 # Titles that are useless when a reminder fires — we replace them with real content
 _GENERIC_TITLE_RE = re.compile(
     r"^\s*(напомин\w*|reminder|каждые?|every|repeat|повтор\w*)\b.*$",
@@ -97,6 +103,10 @@ async def cmd_start(message: Message) -> None:
         f"/напоминания — список активных\n"
         f"/отмена [id] — отменить напоминание\n"
         f"перенеси напоминание N на завтра 10 — переносит\n\n"
+        f"*Привычки и проекты:*\n"
+        f"/привычки — трекер привычек + streak\n"
+        f"/проект <название> — тегать всё в один проект\n"
+        f"/проект stop — снять контекст проекта\n\n"
         f"*Поиск и статистика:*\n"
         f"/поиск <слово> — поиск по записям\n"
         f"/стат — статистика\n"
@@ -440,6 +450,60 @@ async def cmd_export(message: Message) -> None:
     await message.answer("```\n" + "\n".join(lines) + "\n```", parse_mode="Markdown")
 
 
+@router.message(Command("проект"))
+async def cmd_project(message: Message) -> None:
+    global _active_project
+    if not _is_authorized(message):
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    arg = parts[1].strip() if len(parts) > 1 else ""
+    if not arg or arg.lower() in ("stop", "стоп", "off", "выкл"):
+        _active_project = None
+        await message.answer("🔵 Контекст проекта снят. Записи идут без проекта.")
+    else:
+        _active_project = arg.lower().replace(" ", "_")
+        await message.answer(
+            f"📁 Проект: *{_active_project}*\n"
+            f"Все новые записи будут помечены тегом `#{_active_project}`.\n"
+            f"Чтобы снять — `/проект stop`",
+            parse_mode="Markdown",
+        )
+
+
+@router.message(Command("привычки"))
+async def cmd_habits(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    habits = await db.get_habits()
+    if not habits:
+        await message.answer("Привычек нет. Напиши «трекай выпить воду каждый день» — добавлю.")
+        return
+    lines = [f"🔁 *Привычки ({len(habits)}):*\n"]
+    for h in habits:
+        streak = await db.get_habit_streak(h.id)
+        streak_str = f" 🔥{streak}" if streak > 1 else ""
+        lines.append(f"[{h.id}] {_md(h.title or h.content[:60])}{streak_str}")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"✅ {_md(h.title or h.content[:30])}", callback_data=f"habit_done:{h.id}")]
+        for h in habits[:8]
+    ])
+    await message.answer("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("habit_done:"))
+async def cb_habit_done(callback: CallbackQuery) -> None:
+    habit_id = int(callback.data.split(":")[1])
+    habit = await db.close_entry(habit_id)  # mark today's check as done
+    # Re-open the habit itself so it persists
+    await db.reopen_entry(habit_id)
+    streak = await db.get_habit_streak(habit_id)
+    await callback.answer(f"✅ Отмечено! 🔥{streak} дней подряд" if streak > 1 else "✅ Отмечено!")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
 @router.channel_post(F.text)
 async def on_channel_text(message: Message, bot: Bot) -> None:
     # Discovery: if CHANNEL_ID not set, report which channel the bot was added to
@@ -598,7 +662,12 @@ async def on_text(message: Message) -> None:
         await _save_url(message, text)
         return
 
-    await _process(message, raw_kind=RawKind.TEXT, content=text)
+    # ── Detect reply-to-entry ──────────────────────────────────────────────────
+    reply_entry_id: Optional[int] = None
+    if message.reply_to_message:
+        reply_entry_id = _bot_msg_to_entry.get(message.reply_to_message.message_id)
+
+    await _process(message, raw_kind=RawKind.TEXT, content=text, reply_entry_id=reply_entry_id)
 
 
 async def _save_url(message: Message, url: str) -> None:
@@ -642,6 +711,7 @@ async def _process(
     content: str,
     audio: Optional[bytes] = None,
     image: Optional[bytes] = None,
+    reply_entry_id: Optional[int] = None,
 ) -> None:
     try:
         history = await db.get_recent(20)
@@ -654,13 +724,27 @@ async def _process(
     try:
         result: ClassificationResult = await gemini_client.classify(
             content=content, history=history, chat_buffer=list(_chat_buffer),
-            audio_bytes=audio, image_bytes=image
+            audio_bytes=audio, image_bytes=image,
+            reply_entry_id=reply_entry_id,
         )
     except Exception:
         logger.exception("Groq classification failed")
         await message.answer("⚠️ Не получилось обработать сообщение.")
         return
 
+    # ── Reply/append to existing entry ────────────────────────────────────────
+    if result.is_reply_append and result.reply_entry_id and result.append_text:
+        updated = await db.append_to_entry(result.reply_entry_id, result.append_text)
+        if updated:
+            await message.answer(
+                f"✏️ Добавлено к [{updated.id}] _{_md(updated.title or updated.content[:80])}_",
+                parse_mode="Markdown",
+            )
+        else:
+            await message.answer(f"Не нашёл запись #{result.reply_entry_id}.")
+        return
+
+    # ── Close task ─────────────────────────────────────────────────────────────
     if result.is_close_task_command:
         closed = (
             await db.close_task(result.close_task_id)
@@ -673,6 +757,7 @@ async def _process(
             await message.answer("Не нашёл открытую задачу.")
         return
 
+    # ── Postpone reminder ──────────────────────────────────────────────────────
     if result.is_postpone and result.postpone_id and result.postpone_to:
         try:
             new_at = dateparser.isoparse(result.postpone_to)
@@ -692,6 +777,7 @@ async def _process(
         )
         return
 
+    # ── Conversational ─────────────────────────────────────────────────────────
     if result.is_conversational and result.reply:
         _buf_add("bot", result.reply)
         await message.answer(result.reply)
@@ -701,9 +787,134 @@ async def _process(
     if not final_content:
         final_content = result.title
 
-    hashtags = [t.lstrip("#") for t in TAG_RE.findall(final_content)]
-    tags = list(dict.fromkeys([*result.tags, *hashtags]))
+    # ── Multi-entry batch (voice with several items) ───────────────────────────
+    if result.multi_entries and len(result.multi_entries) >= 2:
+        await _save_batch(message, result.multi_entries, raw_kind)
+        return
 
+    # ── Habit done check-in ────────────────────────────────────────────────────
+    if result.is_habit_done:
+        habits = await db.get_habits()
+        matched = None
+        if habits:
+            q_lower = (final_content or "").lower()
+            for h in habits:
+                hw = (h.title or h.content or "").lower()
+                if any(w in q_lower for w in hw.split()[:3] if len(w) > 3):
+                    matched = h
+                    break
+        if matched:
+            streak = await db.get_habit_streak(matched.id)
+            await message.answer(
+                f"✅ *{_md(matched.title or matched.content[:60])}* отмечено!\n"
+                f"{'🔥 ' + str(streak + 1) + ' дней подряд' if streak >= 1 else 'Начинаем серию 🚀'}",
+                parse_mode="Markdown",
+            )
+            return
+
+    # ── Dedup guard ────────────────────────────────────────────────────────────
+    if result.category != Category.REMINDER:
+        dup = await db.find_duplicate(result.title or "", final_content or "")
+        if dup:
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="Да, добавить", callback_data=f"dedup_save:{dup.id}"),
+                InlineKeyboardButton(text="Отмена",       callback_data="dedup_cancel"),
+            ]])
+            await message.answer(
+                f"⚠️ Похожая запись уже есть:\n[{dup.id}] _{_md(dup.title or dup.content[:80])}_\n\nВсё равно сохранить?",
+                parse_mode="Markdown", reply_markup=kb,
+            )
+            # Stash the pending save context in buffer for the callback
+            _pending_saves[message.message_id] = (result, final_content, raw_kind)
+            return
+
+    hashtags = [t.lstrip("#") for t in TAG_RE.findall(final_content or "")]
+    tags = list(dict.fromkeys([*result.tags, *hashtags]))
+    if _active_project:
+        tags = list(dict.fromkeys([_active_project, *tags]))
+
+    due_date = None
+    if result.due_date:
+        try:
+            due_date = dateparser.isoparse(result.due_date)
+        except Exception:
+            logger.warning("Bad due_date: %r", result.due_date)
+
+    await _do_save(message, result, final_content, tags, raw_kind, due_date)
+
+
+# Pending saves waiting for dedup confirmation
+_pending_saves: dict[int, tuple] = {}
+
+
+@router.callback_query(F.data.startswith("dedup_save:"))
+async def cb_dedup_save(callback: CallbackQuery) -> None:
+    msg_id = callback.message.reply_to_message.message_id if callback.message.reply_to_message else None
+    save_data = _pending_saves.pop(msg_id, None) if msg_id else None
+    await callback.answer()
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    if save_data:
+        result, final_content, raw_kind = save_data
+        await _do_save(callback.message, result, final_content, result.tags, raw_kind, None)
+    else:
+        await callback.message.answer("Нажми кнопку сразу после сообщения.")
+
+
+@router.callback_query(F.data == "dedup_cancel")
+async def cb_dedup_cancel(callback: CallbackQuery) -> None:
+    await callback.answer("Отменено")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
+async def _save_batch(message: Message, items: list[dict], raw_kind: RawKind) -> None:
+    """Save multiple entries from one voice/text message."""
+    saved = []
+    for item in items[:10]:
+        try:
+            cat = Category(item.get("category", "task"))
+        except ValueError:
+            cat = Category.TASK
+        try:
+            pri = Priority(item.get("priority", "normal"))
+        except ValueError:
+            pri = Priority.NORMAL
+        due = None
+        if item.get("due_date"):
+            try:
+                due = dateparser.isoparse(item["due_date"])
+            except Exception:
+                pass
+        tags = [_active_project] if _active_project else []
+        entry = await db.insert_entry(Entry(
+            content=item.get("content") or item.get("title", ""),
+            title=item.get("title", "")[:80],
+            category=cat, priority=pri, status=Status.OPEN,
+            tags=tags, raw_kind=raw_kind, due_date=due,
+        ))
+        asyncio.create_task(notion.create_note(entry))
+        saved.append(entry)
+    cat_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝", "habit": "🔁"}
+    lines = [f"📦 Сохранено {len(saved)} записей:\n"]
+    for e in saved:
+        icon = cat_icons.get(e.category.value, "•")
+        lines.append(f"{icon} [{e.id}] {_md(e.title or e.content[:60])}")
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+async def _do_save(
+    message: Message,
+    result: ClassificationResult,
+    final_content: str,
+    tags: list[str],
+    raw_kind: RawKind,
+    due_date,
+) -> None:
     try:
         entry = await db.insert_entry(
             Entry(
@@ -714,6 +925,7 @@ async def _process(
                 status=Status.OPEN,
                 tags=tags,
                 raw_kind=raw_kind,
+                due_date=due_date,
             )
         )
     except Exception:
@@ -723,16 +935,13 @@ async def _process(
 
     asyncio.create_task(notion.create_note(entry))
 
+    # Track bot message → entry_id for reply-to-entry
     reminder_msg = ""
-    if result.category == Category.REMINDER:
-        # Multiple reminders from one message
+    if result.category == Category.REMINDER or result.category == Category.HABIT:
         specs: list[ReminderSpec] = result.reminders or []
         if not specs:
-            # Fall back to top-level fields (single reminder)
             specs = [ReminderSpec(title=result.title, remind_at=result.remind_at, recurrence=result.recurrence)]
 
-        # Repair: if any spec has a useless title like "Напоминание каждые 30 мин",
-        # replace with the meaningful title from a sibling spec (or entry content).
         good_title = _best_reminder_title(specs, result.title or final_content[:80])
         for spec in specs:
             if _is_generic_reminder_title(spec.title):
@@ -764,24 +973,30 @@ async def _process(
         if len(scheduled) == 1:
             reminder_msg = f" · {scheduled[0]}"
         elif scheduled:
-            reminder_msg = f" · {len(scheduled)} напоминания"
+            reminder_msg = f" · {len(scheduled)} напомин."
+
+    due_str = ""
+    if due_date:
+        due_str = f" · 📅 до {due_date:%d.%m}"
 
     transcript_preview = ""
     if raw_kind in (RawKind.VOICE, RawKind.PHOTO) and result.transcript:
         transcript_preview = f"\n📝 _{result.transcript[:200]}_"
 
-    category_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝"}
+    category_icons = {"task": "📋", "thought": "💭", "idea": "💡", "reminder": "⏰", "note": "📝", "habit": "🔁"}
     priority_icons = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}
     cat_icon = category_icons.get(result.category.value, "✅")
     pri_icon = priority_icons.get(result.priority.value, "")
 
     reply_text = (
         f"{cat_icon} Сохранено · {pri_icon} {result.priority.value} · "
-        f"[{entry.id}] _{_md(entry.title)}_{reminder_msg}{transcript_preview}"
+        f"[{entry.id}] _{_md(entry.title)}_{reminder_msg}{due_str}{transcript_preview}"
     )
     _buf_add("bot", reply_text)
-    kb = _make_action_kb(entry.id) if result.category != Category.REMINDER else None
-    await message.answer(reply_text, parse_mode="Markdown", reply_markup=kb)
+    kb = _make_action_kb(entry.id) if result.category not in (Category.REMINDER, Category.HABIT) else None
+    sent = await message.answer(reply_text, parse_mode="Markdown", reply_markup=kb)
+    # Store mapping for reply-to-entry
+    _bot_msg_to_entry[sent.message_id] = entry.id
 
 
 async def send_daily_digest(bot: Bot) -> None:
@@ -795,7 +1010,8 @@ async def send_daily_digest(bot: Bot) -> None:
         parts.append(f"\n*Открытые задачи ({len(open_tasks)})*")
         for t in open_tasks[:15]:
             priority_icon = {"urgent": "🔴", "normal": "🟡", "someday": "⚪"}.get(t.priority.value, "")
-            parts.append(f"  {priority_icon} [{t.id}] {t.title or t.content[:80]}")
+            due = f" 📅{t.due_date:%d.%m}" if t.due_date else ""
+            parts.append(f"  {priority_icon} [{t.id}] {t.title or t.content[:80]}{due}")
     if today_reminders:
         parts.append("\n*Напоминания на сегодня*")
         parts.extend(
