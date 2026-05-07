@@ -5,6 +5,7 @@ from typing import Optional
 
 import pytz
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -20,6 +21,21 @@ _bot: Optional[Bot] = None
 _tz = pytz.timezone(settings.TZ)
 
 
+def _fired_kb(reminder_id: int, recurring: bool) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(text="✅ Сделал", callback_data=f"rem_done:{reminder_id}"),
+            InlineKeyboardButton(text="😴 +10м", callback_data=f"rem_snooze:{reminder_id}:10"),
+            InlineKeyboardButton(text="⏰ +1ч", callback_data=f"rem_snooze:{reminder_id}:60"),
+        ],
+    ]
+    if recurring:
+        rows.append([InlineKeyboardButton(text="🔇 Прекратить серию", callback_data=f"rem_stop:{reminder_id}")])
+    else:
+        rows.append([InlineKeyboardButton(text="🗑️ Скрыть", callback_data=f"rem_hide:{reminder_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def init(bot: Bot) -> AsyncIOScheduler:
     global _scheduler, _bot
     _bot = bot
@@ -30,11 +46,33 @@ def init(bot: Bot) -> AsyncIOScheduler:
 
 async def _send_reminder(reminder_id: int, content: str, recurring: bool) -> None:
     try:
-        await _bot.send_message(settings.MY_CHAT_ID, f"⏰ {content}")
+        await _bot.send_message(
+            settings.MY_CHAT_ID,
+            f"⏰ {content}",
+            reply_markup=_fired_kb(reminder_id, recurring),
+        )
         if not recurring:
             await db.mark_reminder_fired(reminder_id)
     except Exception:
         logger.exception("Failed to send reminder %s", reminder_id)
+
+
+async def snooze_reminder(reminder_id: int, minutes: int) -> Optional[datetime]:
+    """Create a one-shot follow-up of an existing reminder N minutes from now."""
+    if _scheduler is None:
+        raise RuntimeError("scheduler not initialised")
+    rem = await db.get_reminder(reminder_id)
+    if rem is None:
+        return None
+    new_at = datetime.now(_tz) + timedelta(minutes=minutes)
+    new_rem = await db.insert_reminder(Reminder(
+        entry_id=rem.entry_id,
+        remind_at=new_at,
+        recurrence=None,
+        content=rem.content,
+    ))
+    schedule_reminder(new_rem)
+    return new_at
 
 
 def schedule_reminder(reminder: Reminder) -> None:
@@ -57,13 +95,18 @@ def schedule_reminder(reminder: Reminder) -> None:
         now = datetime.now(reminder.remind_at.tzinfo or _tz)
         if reminder.remind_at <= now:
             missed_by = (now - reminder.remind_at).total_seconds()
-            if missed_by < 300:  # fire if missed by less than 5 min
+            # Fire missed one-shots up to 6h late, with a "(late)" mark.
+            # Older than 6h is silently skipped — assume user already moved on.
+            if missed_by < 6 * 3600:
+                mins = int(missed_by // 60)
+                late_note = f" <i>(опоздало на {mins} мин)</i>" if mins >= 2 else ""
                 logger.info("Reminder %s missed by %.0fs — firing now", reminder.id, missed_by)
                 asyncio.get_event_loop().create_task(
-                    _send_reminder(reminder.id, content, False)
+                    _send_reminder(reminder.id, content + late_note, False)
                 )
             else:
                 logger.info("Reminder %s too old (%.0fs) — skipping", reminder.id, missed_by)
+                asyncio.get_event_loop().create_task(db.mark_reminder_fired(reminder.id))
             return
         _scheduler.add_job(
             _send_reminder,

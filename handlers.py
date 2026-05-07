@@ -32,6 +32,26 @@ TAG_RE = re.compile(r"#([\wа-яА-ЯёЁ\-]+)", re.UNICODE)
 DONE_RE = re.compile(r"^\s*(сделал|сделано|готово|выполнено|done)\b\s*(.*)?", re.IGNORECASE)
 URL_RE  = re.compile(r"^https?://\S+$", re.IGNORECASE)
 
+# Titles that are useless when a reminder fires — we replace them with real content
+_GENERIC_TITLE_RE = re.compile(
+    r"^\s*(напомин\w*|reminder|каждые?|every|repeat|повтор\w*)\b.*$",
+    re.IGNORECASE | re.UNICODE,
+)
+
+
+def _is_generic_reminder_title(title: str) -> bool:
+    if not title or len(title.strip()) < 4:
+        return True
+    return bool(_GENERIC_TITLE_RE.match(title.strip()))
+
+
+def _best_reminder_title(specs: list, fallback: str) -> str:
+    """Pick the most meaningful title from a batch — used to repair generic siblings."""
+    for s in specs:
+        if s.title and not _is_generic_reminder_title(s.title):
+            return s.title
+    return fallback
+
 
 def _make_action_kb(entry_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -72,8 +92,11 @@ async def cmd_start(message: Message) -> None:
         f"/done [id] — закрыть задачу\n"
         f"сделал [слово/id] — закрыть по названию\n\n"
         f"*Напоминания:*\n"
+        f"/сегодня — план на сегодня\n"
+        f"/завтра — план на завтра\n"
         f"/напоминания — список активных\n"
-        f"/отмена [id] — отменить напоминание\n\n"
+        f"/отмена [id] — отменить напоминание\n"
+        f"перенеси напоминание N на завтра 10 — переносит\n\n"
         f"*Поиск и статистика:*\n"
         f"/поиск <слово> — поиск по записям\n"
         f"/стат — статистика\n"
@@ -115,6 +138,57 @@ async def cb_cancel_reminder(callback: CallbackQuery) -> None:
     await db.mark_reminder_fired(rem_id)
     scheduler.cancel_reminder(rem_id)
     await callback.answer("⏰ Напоминание отменено")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
+@router.callback_query(F.data.startswith("rem_done:"))
+async def cb_rem_done(callback: CallbackQuery) -> None:
+    rem_id = int(callback.data.split(":")[1])
+    rem = await db.get_reminder(rem_id)
+    if rem and rem.entry_id:
+        await db.close_entry(rem.entry_id)
+    if rem and not rem.recurrence:
+        await db.mark_reminder_fired(rem_id)
+    await callback.answer("✅ Сделано!")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
+@router.callback_query(F.data.startswith("rem_snooze:"))
+async def cb_rem_snooze(callback: CallbackQuery) -> None:
+    parts = callback.data.split(":")
+    rem_id, minutes = int(parts[1]), int(parts[2])
+    new_at = await scheduler.snooze_reminder(rem_id, minutes)
+    if new_at:
+        await callback.answer(f"😴 Отложено до {new_at:%H:%M}")
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+    else:
+        await callback.answer("Не нашёл напоминание", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("rem_stop:"))
+async def cb_rem_stop(callback: CallbackQuery) -> None:
+    rem_id = int(callback.data.split(":")[1])
+    await db.mark_reminder_fired(rem_id)
+    scheduler.cancel_reminder(rem_id)
+    await callback.answer("🔇 Серия остановлена")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+
+@router.callback_query(F.data.startswith("rem_hide:"))
+async def cb_rem_hide(callback: CallbackQuery) -> None:
+    await callback.answer()
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
     except Exception:
@@ -268,6 +342,54 @@ async def cmd_reminders_list(message: Message) -> None:
         )])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+
+
+async def _day_view(message: Message, day_offset: int, label: str) -> None:
+    import pytz
+    tz = pytz.timezone(settings.TZ)
+    today_local = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = today_local + timedelta(days=day_offset)
+    end = start + timedelta(days=1)
+    rems = await db.get_reminders_in_range(start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+
+    open_tasks = []
+    if day_offset == 0:
+        open_tasks = await db.get_open_tasks()
+        urgent = [t for t in open_tasks if t.priority.value == "urgent"]
+        normal = [t for t in open_tasks if t.priority.value == "normal"]
+        open_tasks = (urgent + normal)[:8]
+
+    lines = [f"📅 *{label} ({start:%d.%m, %a})*\n"]
+
+    if rems:
+        lines.append(f"⏰ *Напоминания ({len(rems)}):*")
+        for r in rems[:20]:
+            t_str = r.remind_at.astimezone(tz).strftime("%H:%M") if r.remind_at else "?"
+            lines.append(f"  {t_str} · [{r.id}] {_md(r.content or '')[:80]}")
+    else:
+        lines.append("⏰ Напоминаний нет")
+
+    if day_offset == 0 and open_tasks:
+        lines.append(f"\n📋 *Задачи (топ {len(open_tasks)} из {len(await db.get_open_tasks())}):*")
+        for t in open_tasks:
+            icon = "🔴" if t.priority.value == "urgent" else "🟡"
+            lines.append(f"  {icon} [{t.id}] {_md(t.title or t.content[:80])}")
+
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(Command("сегодня"))
+async def cmd_today(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    await _day_view(message, 0, "Сегодня")
+
+
+@router.message(Command("завтра"))
+async def cmd_tomorrow(message: Message) -> None:
+    if not _is_authorized(message):
+        return
+    await _day_view(message, 1, "Завтра")
 
 
 @router.message(Command("отмена"))
@@ -551,6 +673,25 @@ async def _process(
             await message.answer("Не нашёл открытую задачу.")
         return
 
+    if result.is_postpone and result.postpone_id and result.postpone_to:
+        try:
+            new_at = dateparser.isoparse(result.postpone_to)
+        except Exception:
+            await message.answer("⚠️ Не разобрал новое время.")
+            return
+        scheduler.cancel_reminder(result.postpone_id)
+        updated = await db.update_reminder_time(result.postpone_id, new_at)
+        if not updated:
+            await message.answer(f"Не нашёл напоминание #{result.postpone_id}.")
+            return
+        scheduler.schedule_reminder(updated)
+        await message.answer(
+            f"📅 Перенёс напоминание #{updated.id} на {new_at:%d.%m %H:%M}\n"
+            f"_{_md(updated.content or '')[:120]}_",
+            parse_mode="Markdown",
+        )
+        return
+
     if result.is_conversational and result.reply:
         _buf_add("bot", result.reply)
         await message.answer(result.reply)
@@ -589,6 +730,13 @@ async def _process(
         if not specs:
             # Fall back to top-level fields (single reminder)
             specs = [ReminderSpec(title=result.title, remind_at=result.remind_at, recurrence=result.recurrence)]
+
+        # Repair: if any spec has a useless title like "Напоминание каждые 30 мин",
+        # replace with the meaningful title from a sibling spec (or entry content).
+        good_title = _best_reminder_title(specs, result.title or final_content[:80])
+        for spec in specs:
+            if _is_generic_reminder_title(spec.title):
+                spec.title = good_title
 
         scheduled = []
         for spec in specs:

@@ -31,17 +31,42 @@ _SCHEMA_HINT = """Return ONLY valid JSON with these fields:
     {"title": "<short title>", "remind_at": "<ISO 8601 or omit>", "recurrence": "<cron or omit>"}
   ],
   "is_close_task_command": true | false,
-  "close_task_id": <int or omit>
+  "close_task_id": <int or omit>,
+  "is_postpone": true | false,
+  "postpone_id": <int or omit>,
+  "postpone_to": "<ISO 8601 with tz offset, or omit>"
 }
 
-MULTIPLE REMINDERS — use "reminders" array (not top-level fields) when user asks for several at once:
-  Example: "каждое утро в 9 список задач, и каждые 30 минут с 9 до 11 напоминай"
+MULTIPLE REMINDERS — use "reminders" array (not top-level fields) when user asks for several at once.
+
+  CRITICAL — REMINDER TITLE QUALITY:
+  Every reminder title MUST contain the actual content the user wants to be reminded ABOUT.
+  NEVER set a title like "Напоминание каждые 30 мин" or "Reminder every X minutes" — those are useless when they fire.
+  When user says "каждые 30 мин ТАКОЕ ЖЕ напоминание" / "то же самое каждый час" / "напоминай об этом" —
+  REUSE the content/title of the previous reminder in the same message or the latest user intent. The recurring reminder
+  must repeat the meaningful payload, not a meta-description of itself.
+
+  Example (good): "каждое утро в 9 душ, покушать, витамины. И каждые 30 минут с 9 до 11 такое же напоминание"
   → reminders: [
-      {"title": "Утро: душ, витамины, список", "recurrence": "0 9 * * *"},
-      {"title": "Напоминание каждые 30 мин", "recurrence": "0,30 9-10 * * *"}
+      {"title": "Душ, покушать, витамины", "recurrence": "0 9 * * *"},
+      {"title": "Душ, покушать, витамины", "recurrence": "0,30 9-10 * * *"}
+    ]
+  Example (good): "напомни купить духи завтра в 10. И сегодня в 10 утра такое же"
+  → reminders: [
+      {"title": "Купить духи", "remind_at": "<tomorrow 10:00 ISO>"},
+      {"title": "Купить духи", "remind_at": "<today 10:00 ISO>"}
     ]
   Cron tips: "каждый день в 9" → "0 9 * * *", "каждые 30 мин с 9 до 11" → "0,30 9-10 * * *",
-  "каждый пн в 9" → "0 9 * * 1", "каждый час" → "0 * * * *"."""
+  "каждый пн в 9" → "0 9 * * 1", "каждый час" → "0 * * * *".
+
+POSTPONE / EDIT REMINDER (is_postpone=true):
+  When user says "перенеси напоминание 42 на завтра в 10" / "напоминание 42 на +1 час" / "отложи напоминание 5":
+  Return: {"is_postpone": true, "postpone_id": 42, "postpone_to": "<ISO 8601>"}
+  Do NOT save a new entry. is_conversational stays false.
+
+DONE-FOR-RECURRING (is_recurring_done=true):
+  When user says "принял витамины", "сделал утренние дела", "сделал то напоминание" right after a recurring reminder fires —
+  return is_close_task_command=true with close_task_id set to the matching reminder's id IF clear from context."""
 
 
 def _system_prompt(history: list[Entry], chat_buffer: list[dict]) -> str:

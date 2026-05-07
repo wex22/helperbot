@@ -70,6 +70,121 @@ async def api_tasks(request: web.Request) -> web.Response:
         return web.json_response({"error": "db error"}, status=500)
 
 
+def _entry_dict(e: Entry) -> dict:
+    return {
+        "id": e.id,
+        "title": e.title or (e.content[:80] if e.content else ""),
+        "content": e.content,
+        "category": e.category.value,
+        "priority": e.priority.value,
+        "status": e.status.value,
+        "tags": e.tags,
+        "created_at": e.created_at.isoformat() if e.created_at else None,
+    }
+
+
+async def api_entries(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        category = request.query.get("category") or None
+        status = request.query.get("status") or "open"
+        q = (request.query.get("q") or "").strip() or None
+        limit = int(request.query.get("limit") or 200)
+        entries = await db.list_entries(category=category, status=status, q=q, limit=limit)
+        return web.json_response([_entry_dict(e) for e in entries])
+    except Exception:
+        logger.exception("api_entries failed")
+        return web.json_response({"error": "db error"}, status=500)
+
+
+async def api_reminders(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        rems = await db.get_pending_reminders()
+        data = [
+            {
+                "id": r.id,
+                "entry_id": r.entry_id,
+                "content": r.content or "",
+                "remind_at": r.remind_at.isoformat() if r.remind_at else None,
+                "recurrence": r.recurrence,
+            }
+            for r in rems
+        ]
+        # Sort: time first (asc), recurring last
+        data.sort(key=lambda x: (x["remind_at"] is None, x["remind_at"] or ""))
+        return web.json_response(data)
+    except Exception:
+        logger.exception("api_reminders failed")
+        return web.json_response({"error": "db error"}, status=500)
+
+
+async def api_reminder_cancel(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        rem_id = int(request.match_info["id"])
+        await db.mark_reminder_fired(rem_id)
+        scheduler.cancel_reminder(rem_id)
+        return web.json_response({"ok": True})
+    except Exception:
+        logger.exception("api_reminder_cancel failed")
+        return web.json_response({"error": "error"}, status=500)
+
+
+async def api_reminder_snooze(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        rem_id = int(request.match_info["id"])
+        body = await request.json()
+        minutes = int(body.get("minutes", 10))
+        new_at = await scheduler.snooze_reminder(rem_id, minutes)
+        if new_at:
+            return web.json_response({"ok": True, "remind_at": new_at.isoformat()})
+        return web.json_response({"error": "not found"}, status=404)
+    except Exception:
+        logger.exception("api_reminder_snooze failed")
+        return web.json_response({"error": "error"}, status=500)
+
+
+async def api_edit(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        entry_id = int(request.match_info["id"])
+        body = await request.json()
+        allowed = {"title", "content", "priority", "category", "status", "tags"}
+        fields = {k: v for k, v in body.items() if k in allowed and v is not None}
+        # validate enums
+        if "priority" in fields:
+            fields["priority"] = Priority(fields["priority"]).value
+        if "category" in fields:
+            fields["category"] = Category(fields["category"]).value
+        if "status" in fields:
+            fields["status"] = Status(fields["status"]).value
+        updated = await db.update_entry(entry_id, fields)
+        if not updated:
+            return web.json_response({"error": "not found"}, status=404)
+        return web.json_response({"ok": True, "entry": _entry_dict(updated)})
+    except Exception:
+        logger.exception("api_edit failed")
+        return web.json_response({"error": "error"}, status=500)
+
+
+async def api_stats(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        s = await db.get_stats()
+        return web.json_response(s)
+    except Exception:
+        logger.exception("api_stats failed")
+        return web.json_response({"error": "error"}, status=500)
+
+
 async def api_close(request: web.Request) -> web.Response:
     if not _check_token(request):
         return web.json_response({"error": "forbidden"}, status=403)
@@ -103,19 +218,28 @@ async def api_add(request: web.Request) -> web.Response:
         return web.json_response({"error": "bad json"}, status=400)
 
     content = (body.get("content") or "").strip()
-    priority_str = body.get("priority", "normal")
     if not content:
         return web.json_response({"error": "empty content"}, status=400)
+
     try:
-        priority = Priority(priority_str)
+        priority = Priority(body.get("priority", "normal"))
     except ValueError:
         priority = Priority.NORMAL
 
     try:
+        category = Category(body.get("category", "task"))
+    except ValueError:
+        category = Category.TASK
+
+    title = (body.get("title") or content[:80]).strip()[:80]
+    remind_at_str = body.get("remind_at")  # ISO string, optional
+    recurrence = body.get("recurrence")     # cron string, optional
+
+    try:
         entry = await db.insert_entry(Entry(
             content=content,
-            title=content[:80],
-            category=Category.TASK,
+            title=title,
+            category=category,
             priority=priority,
             status=Status.OPEN,
             tags=[],
@@ -123,7 +247,28 @@ async def api_add(request: web.Request) -> web.Response:
             source="miniapp",
         ))
         asyncio.create_task(notion.create_note(entry))
-        return web.json_response({"ok": True, "id": entry.id})
+
+        rem_id = None
+        if remind_at_str or recurrence:
+            from datetime import datetime as _dt
+            from models import Reminder
+            remind_at = None
+            if remind_at_str:
+                try:
+                    remind_at = _dt.fromisoformat(remind_at_str.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            if remind_at or recurrence:
+                rem = await db.insert_reminder(Reminder(
+                    entry_id=entry.id,
+                    remind_at=remind_at,
+                    recurrence=recurrence,
+                    content=title or content[:120],
+                ))
+                scheduler.schedule_reminder(rem)
+                rem_id = rem.id
+
+        return web.json_response({"ok": True, "id": entry.id, "reminder_id": rem_id})
     except Exception:
         logger.exception("api_add failed")
         return web.json_response({"error": "db error"}, status=500)
@@ -209,9 +354,15 @@ def build_app() -> web.Application:
     # Mini App
     app.router.add_get("/app", serve_app)
     app.router.add_get("/api/tasks", api_tasks)
+    app.router.add_get("/api/entries", api_entries)
+    app.router.add_get("/api/reminders", api_reminders)
+    app.router.add_get("/api/stats", api_stats)
     app.router.add_post("/api/close/{id}", api_close)
     app.router.add_post("/api/delete/{id}", api_delete)
+    app.router.add_post("/api/edit/{id}", api_edit)
     app.router.add_post("/api/add", api_add)
+    app.router.add_post("/api/reminder/cancel/{id}", api_reminder_cancel)
+    app.router.add_post("/api/reminder/snooze/{id}", api_reminder_snooze)
 
     SimpleRequestHandler(
         dispatcher=dp,

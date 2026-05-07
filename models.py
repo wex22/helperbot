@@ -49,6 +49,9 @@ class ClassificationResult(BaseModel):
     close_task_id: Optional[int] = None
     is_conversational: bool = False
     reply: Optional[str] = None
+    is_postpone: bool = False
+    postpone_id: Optional[int] = None
+    postpone_to: Optional[str] = None
 
 
 class Entry(BaseModel):

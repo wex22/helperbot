@@ -156,6 +156,53 @@ async def close_entry(entry_id: int) -> Optional[Entry]:
         return _to_entry(data[0]) if data else None
 
 
+async def reopen_entry(entry_id: int) -> Optional[Entry]:
+    async with _client() as c:
+        r = await c.patch(
+            "/entries",
+            params={"id": f"eq.{entry_id}"},
+            json={"status": Status.OPEN.value},
+        )
+        r.raise_for_status()
+        data = r.json()
+        return _to_entry(data[0]) if data else None
+
+
+async def update_entry(entry_id: int, fields: dict) -> Optional[Entry]:
+    """Patch arbitrary subset of entry fields. Caller must pass only known columns."""
+    if not fields:
+        return None
+    async with _client() as c:
+        r = await c.patch(
+            "/entries",
+            params={"id": f"eq.{entry_id}"},
+            json=fields,
+        )
+        r.raise_for_status()
+        data = r.json()
+        return _to_entry(data[0]) if data else None
+
+
+async def list_entries(
+    *,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 200,
+) -> list[Entry]:
+    params: dict = {"order": "created_at.desc", "limit": str(limit)}
+    if category:
+        params["category"] = f"eq.{category}"
+    if status:
+        params["status"] = f"eq.{status}"
+    if q:
+        params["or"] = f"(content.ilike.*{q}*,title.ilike.*{q}*)"
+    async with _client() as c:
+        r = await c.get("/entries", params=params)
+        r.raise_for_status()
+        return [_to_entry(row) for row in r.json()]
+
+
 async def delete_entry(entry_id: int) -> None:
     async with _client() as c:
         r = await c.delete("/entries", params={"id": f"eq.{entry_id}"})
@@ -211,6 +258,18 @@ async def get_pending_reminders() -> list[Reminder]:
         })
         r.raise_for_status()
         return [_to_reminder(row) for row in r.json()]
+
+
+async def get_reminder(reminder_id: int) -> Optional[Reminder]:
+    async with _client() as c:
+        r = await c.get("/reminders", params={
+            "id": f"eq.{reminder_id}",
+            "select": "*,entries(content,title)",
+            "limit": 1,
+        })
+        r.raise_for_status()
+        rows = r.json()
+        return _to_reminder(rows[0]) if rows else None
 
 
 async def mark_reminder_fired(reminder_id: int) -> None:
@@ -290,3 +349,30 @@ async def get_reminders_firing_today() -> list[Reminder]:
         })
         r.raise_for_status()
         return [_to_reminder(row) for row in r.json()]
+
+
+async def get_reminders_in_range(start: datetime, end: datetime) -> list[Reminder]:
+    async with _client() as c:
+        r = await c.get("/reminders", params={
+            "fired": "eq.false",
+            "remind_at": f"gte.{start.isoformat()}",
+            "and": f"(remind_at.lt.{end.isoformat()})",
+            "select": "*,entries(content,title)",
+            "order": "remind_at.asc",
+        })
+        r.raise_for_status()
+        return [_to_reminder(row) for row in r.json()]
+
+
+async def update_reminder_time(reminder_id: int, new_time: datetime) -> Optional[Reminder]:
+    async with _client() as c:
+        r = await c.patch(
+            "/reminders",
+            params={"id": f"eq.{reminder_id}"},
+            json={"remind_at": new_time.isoformat(), "fired": False},
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            return None
+        return await get_reminder(reminder_id)
