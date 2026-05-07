@@ -92,3 +92,21 @@ async def create_note(entry: Entry) -> None:
         await asyncio.to_thread(_create)
     except Exception:
         logger.exception("Failed to create Notion page")
+
+
+async def close_note(entry: Entry) -> None:
+    title = entry.title or entry.content[:80]
+
+    def _find_and_archive():
+        results = _notion.databases.query(
+            database_id=settings.NOTION_DB_ID,
+            filter={"property": "Title", "title": {"equals": title}},
+        )
+        for page in (results.get("results") or []):
+            if not page.get("archived"):
+                _notion.pages.update(page["id"], archived=True)
+
+    try:
+        await asyncio.to_thread(_find_and_archive)
+    except Exception:
+        logger.exception("Failed to archive Notion page for entry %s", entry.id)

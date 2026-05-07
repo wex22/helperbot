@@ -191,7 +191,9 @@ async def api_close(request: web.Request) -> web.Response:
         return web.json_response({"error": "forbidden"}, status=403)
     try:
         entry_id = int(request.match_info["id"])
-        await db.close_entry(entry_id)
+        entry = await db.close_entry(entry_id)
+        if entry:
+            asyncio.create_task(notion.close_note(entry))
         return web.json_response({"ok": True})
     except Exception:
         logger.exception("api_close failed")

@@ -378,17 +378,20 @@ textarea.sh-field { min-height: 80px; resize: none; }
 
 /* ── Toast ──────────────────────────────────────────────────────────── */
 .toast {
-  position: fixed; top: 12px; left: 50%; transform: translateX(-50%) translateY(-90px);
-  background: rgba(30,45,61,.95); color: var(--text); padding: 10px 18px;
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 14px);
+  left: 50%; transform: translateX(-50%) translateY(24px);
+  background: rgba(30,45,61,.97); color: var(--text); padding: 11px 20px;
   border-radius: 20px; font-size: 13.5px; font-weight: 600; z-index: 999;
-  transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
-  max-width: 90vw; text-align: center; backdrop-filter: blur(8px);
+  transition: transform .28s cubic-bezier(.34,1.56,.64,1), opacity .28s;
+  max-width: 88vw; text-align: center; backdrop-filter: blur(10px);
   border: 1px solid rgba(255,255,255,.1);
-  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none;
 }
-.toast.show { transform: translateX(-50%) translateY(0); }
-.toast.ok   { background: rgba(52,199,89,.9); color: #fff; }
-.toast.err  { background: rgba(255,59,48,.9);  color: #fff; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.ok   { background: rgba(52,199,89,.95); color: #fff; }
+.toast.err  { background: rgba(255,59,48,.95);  color: #fff; }
 
 /* ── Swipe hint ─────────────────────────────────────────────────────── */
 .swipe-hint {
@@ -737,8 +740,12 @@ async function loadTasks() {
   const el = document.getElementById('task-list');
   el.innerHTML = skeletons(5);
   try {
-    const data = await fetchEntries({ status: 'open', category: 'task' });
+    const [data, rems] = await Promise.all([
+      fetchEntries({ status: 'open', category: 'task' }),
+      api('/api/reminders'),
+    ]);
     entries = Array.isArray(data) ? data : [];
+    reminders = Array.isArray(rems) ? rems : [];
     buildRemsByEntry();
     renderTasks();
   } catch(e) { el.innerHTML = errHtml(); }
@@ -792,8 +799,14 @@ async function loadAll() {
       : catFilter === 'all'
         ? { status: 'open' }
         : { status: 'open', category: catFilter };
-    const data = await fetchEntries(params);
+    const [data, rems] = await Promise.all([
+      fetchEntries(params),
+      api('/api/reminders'),
+    ]);
     const arr = Array.isArray(data) ? data : [];
+    entries = arr;
+    reminders = Array.isArray(rems) ? rems : [];
+    buildRemsByEntry();
 
     if (!arr.length) {
       el.innerHTML = emptyHtml('✨', 'Пусто', searchQ ? `Ничего по «${esc(searchQ)}»` : 'Здесь пока нет записей');
@@ -1035,15 +1048,26 @@ function initSwipe(container) {
 
     card.addEventListener('touchend', async () => {
       const m = main(); if (!m) return;
-      m.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)';
-      m.style.transform = '';
-      const done = bgDone(), del = bgDel();
-      if (done) { done.style.transition = 'opacity .2s'; done.style.opacity = 0; }
-      if (del)  { del.style.transition  = 'opacity .2s'; del.style.opacity  = 0; }
       const id = parseInt(card.dataset.id);
-      if (swiping) {
-        if (dx > 80)       doClose(id, card.querySelector('.btn-done'));
-        else if (dx < -80) doDelete(id);
+      if (swiping && dx > 80) {
+        // Slide off to the right → Done
+        m.style.transition = 'transform .22s ease-in';
+        m.style.transform = 'translateX(110vw)';
+        const bg = bgDone(); if (bg) bg.style.opacity = 1;
+        setTimeout(() => doClose(id, card.querySelector('.btn-done')), 180);
+      } else if (swiping && dx < -80) {
+        // Slide off to the left → Delete
+        m.style.transition = 'transform .22s ease-in';
+        m.style.transform = 'translateX(-110vw)';
+        const bg = bgDel(); if (bg) bg.style.opacity = 1;
+        setTimeout(() => doDelete(id), 180);
+      } else {
+        // Snap back
+        m.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
+        m.style.transform = '';
+        const done = bgDone(), del = bgDel();
+        if (done) { done.style.transition = 'opacity .2s'; done.style.opacity = 0; }
+        if (del)  { del.style.transition  = 'opacity .2s'; del.style.opacity  = 0; }
       }
       swiping = false;
     });
