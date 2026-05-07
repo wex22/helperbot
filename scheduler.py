@@ -109,6 +109,17 @@ def schedule_overdue_check(check_overdue_callback) -> None:
     )
 
 
+def cancel_reminder(reminder_id: int) -> None:
+    if _scheduler is None:
+        return
+    job_id = f"reminder-{reminder_id}"
+    try:
+        _scheduler.remove_job(job_id)
+        logger.info("Cancelled reminder job %s", job_id)
+    except Exception:
+        logger.warning("Job %s not found in scheduler (may have already fired)", job_id)
+
+
 async def rehydrate() -> None:
     pending = await db.get_pending_reminders()
     for r in pending:
