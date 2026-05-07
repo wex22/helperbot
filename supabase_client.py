@@ -137,13 +137,14 @@ async def append_to_entry(entry_id: int, extra_text: str) -> Optional[Entry]:
 
 
 async def find_duplicate(title: str, content: str) -> Optional[Entry]:
-    """Look for a very similar entry saved in last hour (dedup guard)."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-    # Use title match first (exact), then content prefix
-    q = title[:60] if title else content[:60]
+    """Look for a very similar entry saved in last 15 min (dedup guard)."""
+    q = (title[:60] if title else content[:60]).strip()
+    if len(q) < 10:  # too short to dedup reliably
+        return None
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
     async with _client() as c:
         r = await c.get("/entries", params={
-            "or": f"(title.ilike.*{q[:40]}*,content.ilike.*{q[:40]}*)",
+            "or": f"(title.ilike.*{q[:60]}*,content.ilike.*{q[:60]}*)",
             "created_at": f"gte.{cutoff}",
             "order": "created_at.desc",
             "limit": 5,

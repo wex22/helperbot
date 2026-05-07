@@ -662,6 +662,31 @@ async def on_text(message: Message) -> None:
         await _save_url(message, text)
         return
 
+    # ── Cancel pending dedup via typed response ────────────────────────────────
+    if _pending_saves:
+        _CANCEL = {"нет", "не", "no", "отмена", "cancel", "н", "нет.", "не."}
+        _CONFIRM = {"да", "yes", "ок", "ok", "д", "да.", "добавить", "сохранить"}
+        tl = text.lower().strip()
+        if tl in _CANCEL:
+            _pending_saves.clear()
+            await message.answer("Отменено.")
+            return
+        if tl in _CONFIRM:
+            _, (pend_result, pend_content, pend_raw_kind) = next(reversed(_pending_saves.items()))
+            _pending_saves.clear()
+            hashtags = [t.lstrip("#") for t in TAG_RE.findall(pend_content or "")]
+            tags = list(dict.fromkeys([*pend_result.tags, *hashtags]))
+            if _active_project:
+                tags = list(dict.fromkeys([_active_project, *tags]))
+            due_date = None
+            if pend_result.due_date:
+                try:
+                    due_date = dateparser.isoparse(pend_result.due_date)
+                except Exception:
+                    pass
+            await _do_save(message, pend_result, pend_content, tags, pend_raw_kind, due_date)
+            return
+
     # ── Detect reply-to-entry ──────────────────────────────────────────────────
     reply_entry_id: Optional[int] = None
     if message.reply_to_message:
